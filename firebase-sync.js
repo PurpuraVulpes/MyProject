@@ -33,6 +33,7 @@ let currentUser = null;
 let isGuestMode = false;
 let unsubHoraires = null;
 let unsubDepenses = null;
+let unsubPaiements = null;
 let unsubSettings = null;
 
 // Auth state listener
@@ -61,8 +62,9 @@ async function resetPassword(email) {
 async function logout() {
     // Stop listeners
     if (unsubHoraires) { unsubHoraires(); unsubHoraires = null; }
-    if (unsubDepenses) { unsubDepenses(); unsubDepenses = null; }
-    if (unsubSettings) { unsubSettings(); unsubSettings = null; }
+if (unsubDepenses) { unsubDepenses(); unsubDepenses = null; }
+if (unsubPaiements) { unsubPaiements(); unsubPaiements = null; }
+if (unsubSettings) { unsubSettings(); unsubSettings = null; }
 
     await auth.signOut();
     currentUser = null;
@@ -149,6 +151,15 @@ async function uploadLocalDataIfNeeded(uid) {
                 batch2.set(docRef, { ...d, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
             });
             await batch2.commit();
+            // Upload paiements in batches
+if (App.paiements && App.paiements.length > 0) {
+    const batch3 = db.batch();
+    App.paiements.forEach(p => {
+        const docRef = ref.collection('paiements').doc(String(p.id));
+        batch3.set(docRef, { ...p, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+    });
+    await batch3.commit();
+}
 
             showToast('☁️ Données locales synchronisées !');
         }
@@ -190,6 +201,21 @@ function startRealtimeSync(uid) {
         saveLocalData();
         if (typeof renderAll === 'function') renderAll();
     }, err => console.error('Depenses sync error:', err));
+
+        // Listen to paiements
+    unsubPaiements = ref.collection('paiements').onSnapshot(snapshot => {
+        App.paiements = [];
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            delete data.updatedAt;
+            App.paiements.push(data);
+        });
+        App.paiements.sort((a, b) => b.mois.localeCompare(a.mois));
+        saveLocalData();
+        if (typeof renderAll === 'function') renderAll();
+    }, err => console.error('Paiements sync error:', err));
+
+    // Listen to settings
 
     // Listen to settings
     unsubSettings = ref.collection('data').doc('settings').onSnapshot(doc => {
@@ -270,14 +296,35 @@ async function cloudDeleteAll() {
         const batch2 = db.batch();
         depenses.forEach(doc => batch2.delete(doc.ref));
         await batch2.commit();
+        const paiements = await ref.collection('paiements').get();
+const batch3 = db.batch();
+paiements.forEach(doc => batch3.delete(doc.ref));
+await batch3.commit();
     } catch (e) {
         console.error('Cloud delete all error:', e);
     }
+}
+
+async function cloudAddPaiement(paiement) {
+    if (!currentUser || isGuestMode) return;
+    try {
+        const ref = db.collection('users').doc(currentUser.uid).collection('paiements').doc(String(paiement.id));
+        await ref.set({ ...paiement, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+    } catch (e) { console.error('Cloud add paiement error:', e); }
+}
+
+async function cloudDeletePaiement(id) {
+    if (!currentUser || isGuestMode) return;
+    try {
+        await db.collection('users').doc(currentUser.uid).collection('paiements').doc(String(id)).delete();
+    } catch (e) { console.error('Cloud delete paiement error:', e); }
 }
 
 // Local save helper
 function saveLocalData() {
     localStorage.setItem('mb_horaires', JSON.stringify(App.horaires));
     localStorage.setItem('mb_depenses', JSON.stringify(App.depenses));
+    localStorage.setItem('mb_paiements', JSON.stringify(App.paiements || []));
     localStorage.setItem('mb_settings', JSON.stringify(App.settings));
+}
 }
