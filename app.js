@@ -4,7 +4,7 @@ const App = {
     horaires: [],
     depenses: [],
     paiements: [],
-    settings: { tauxHoraire: 12.00, devise: '€' },
+    settings: { tauxHoraire: 12.00, devise: '€', arrondi: 'none' },
     activeTab: 'horaires'
 };
 
@@ -502,6 +502,7 @@ function setDefaultDates() {
     if (fa) fa.value = new Date().getFullYear();
     document.getElementById('tauxHoraire').value = App.settings.tauxHoraire;
     document.querySelectorAll('.devise-btn').forEach(b => b.classList.toggle('active', b.dataset.devise === App.settings.devise));
+    document.querySelectorAll('.arrondi-btn').forEach(b => b.classList.toggle('active', b.dataset.arrondi === (App.settings.arrondi || 'none')));
 }
 
 function todayStr() { return new Date().toISOString().split('T')[0]; }
@@ -876,11 +877,32 @@ function initSettings() {
     document.getElementById('tauxPlus').addEventListener('click', () => { const i = document.getElementById('tauxHoraire'); i.value = (parseFloat(i.value)+0.5).toFixed(2); });
     document.getElementById('tauxMinus').addEventListener('click', () => { const i = document.getElementById('tauxHoraire'); const v = parseFloat(i.value)-0.5; if(v>=0)i.value=v.toFixed(2); });
     document.querySelectorAll('.devise-btn').forEach(btn => { btn.addEventListener('click', () => { document.querySelectorAll('.devise-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); }); });
+    document.querySelectorAll('.arrondi-btn').forEach(btn => { btn.addEventListener('click', () => { document.querySelectorAll('.arrondi-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); }); });
 
     document.getElementById('btnSaveSettings').addEventListener('click', () => {
+        const oldArrondi = App.settings.arrondi || 'none';
         App.settings.tauxHoraire = parseFloat(document.getElementById('tauxHoraire').value) || 0;
         App.settings.devise = document.querySelector('.devise-btn.active')?.dataset.devise || '€';
+        App.settings.arrondi = document.querySelector('.arrondi-btn.active')?.dataset.arrondi || 'none';
+
+        // Si l'arrondi a changé, recalculer les minutes de tous les horaires
+        if (oldArrondi !== App.settings.arrondi) {
+            App.horaires.forEach(h => {
+                if (h.debut && h.fin) {
+                    // Recalculer minutes sans passer par calcMinutes (qui utilise le nouvel arrondi)
+                    const [dh,dm] = h.debut.split(':').map(Number);
+                    const [fh,fm] = h.fin.split(':').map(Number);
+                    let t = (fh*60+fm) - (dh*60+dm);
+                    if (t < 0) t += 1440;
+                    t = Math.max(0, t - (h.pause || 0));
+                    h.minutes = applyArrondi(t);
+                }
+            });
+        }
+
+        // Recalculer les gains
         App.horaires.forEach(h => { h.gain = (h.minutes/60)*App.settings.tauxHoraire; });
+
         saveData();
         if (typeof cloudSaveSettings === 'function') cloudSaveSettings();
         if (typeof currentUser !== 'undefined' && currentUser && !isGuestMode) {
@@ -948,7 +970,23 @@ function showToast(msg) {
     t._timer = setTimeout(() => { t.className = 'toast'; }, 2800);
 }
 
-function calcMinutes(d, f, p=0) { const [dh,dm]=d.split(':').map(Number); const [fh,fm]=f.split(':').map(Number); let t=(fh*60+fm)-(dh*60+dm); if(t<0)t+=1440; return Math.max(0,t-p); }
+function calcMinutes(d, f, p=0) {
+    const [dh,dm] = d.split(':').map(Number);
+    const [fh,fm] = f.split(':').map(Number);
+    let t = (fh*60+fm) - (dh*60+dm);
+    if (t < 0) t += 1440;
+    t = Math.max(0, t - p);
+    return applyArrondi(t);
+}
+
+function applyArrondi(minutes) {
+    const arrondi = App.settings.arrondi || 'none';
+    if (arrondi === 'none' || minutes <= 0) return minutes;
+    const step = parseInt(arrondi);
+    if (isNaN(step) || step <= 0) return minutes;
+    // Arrondi à la valeur SUPÉRIEURE
+    return Math.ceil(minutes / step) * step;
+}
 function formatDuree(m) { return `${Math.floor(m/60)}h ${String(m%60).padStart(2,'0')}`; }
 function formatM(a) { return a.toFixed(2).replace('.',',')+' '+App.settings.devise; }
 function formatDate(d) { const [y,m,j]=d.split('-'); return `${j}/${m}/${y}`; }
