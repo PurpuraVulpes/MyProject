@@ -787,3 +787,33 @@ body {
     background: rgba(241,196,15,0.2);
     color: #f1c40f;
 }
+
+/* ===== ARRONDI ===== */
+.arrondi-btn {
+    flex: 1;
+    padding: 12px 6px;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg3);
+    color: var(--text2);
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.arrondi-btn.active {
+    border-color: var(--primary);
+    background: var(--purple-glow);
+    color: var(--text);
+}
+
+.arrondi-hint {
+    display: block;
+    font-size: 0.72rem;
+    color: var(--text3);
+    margin-top: 8px;
+    font-style: italic;
+}
