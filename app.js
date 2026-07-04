@@ -3,6 +3,7 @@
 const App = {
     horaires: [],
     depenses: [],
+    paiements: [],
     settings: { tauxHoraire: 12.00, devise: '€' },
     activeTab: 'horaires'
 };
@@ -439,9 +440,11 @@ function loadData() {
     try {
         const h = localStorage.getItem('mb_horaires');
         const d = localStorage.getItem('mb_depenses');
+        const p = localStorage.getItem('mb_paiements');
         const s = localStorage.getItem('mb_settings');
         if (h) App.horaires = JSON.parse(h);
         if (d) App.depenses = JSON.parse(d);
+        if (p) App.paiements = JSON.parse(p);
         if (s) App.settings = { ...App.settings, ...JSON.parse(s) };
     } catch (e) { console.error(e); }
 }
@@ -449,6 +452,7 @@ function loadData() {
 function saveData() {
     localStorage.setItem('mb_horaires', JSON.stringify(App.horaires));
     localStorage.setItem('mb_depenses', JSON.stringify(App.depenses));
+    localStorage.setItem('mb_paiements', JSON.stringify(App.paiements));
     localStorage.setItem('mb_settings', JSON.stringify(App.settings));
 }
 
@@ -466,11 +470,13 @@ function goTab(tab) {
     document.getElementById('mainScroll').scrollTo({ top: 0, behavior: 'smooth' });
     if (tab === 'resume') renderResume();
     if (tab === 'depenses') renderCatSummary();
+    if (tab === 'paiements') renderPaiements();
 }
 
 function initTabs() {
     document.getElementById('btnToggleFormH').addEventListener('click', () => toggleForm('formCardH', 'btnToggleFormH'));
     document.getElementById('btnToggleFormD').addEventListener('click', () => toggleForm('formCardD', 'btnToggleFormD'));
+    document.getElementById('btnToggleFormP').addEventListener('click', () => toggleForm('formCardP', 'btnToggleFormP'));
 }
 
 function toggleForm(cardId, btnId) {
@@ -498,13 +504,14 @@ function setDefaultDates() {
     const today = todayStr(), month = today.substring(0, 7);
     document.getElementById('dateHoraire').value = today;
     document.getElementById('dateDepense').value = today;
+    document.getElementById('moisPaiement').value = month;
     document.getElementById('filtreHoraireMois').value = month;
     document.getElementById('filtreDepenseMois').value = month;
     document.getElementById('filtreResumeMois').value = month;
+    document.getElementById('filtreAnneeP').value = new Date().getFullYear();
     document.getElementById('tauxHoraire').value = App.settings.tauxHoraire;
     document.querySelectorAll('.devise-btn').forEach(b => b.classList.toggle('active', b.dataset.devise === App.settings.devise));
 }
-
 function todayStr() { return new Date().toISOString().split('T')[0]; }
 
 function updateMonthLabel() {
@@ -520,6 +527,8 @@ function initForms() {
         document.getElementById(id).addEventListener('input', updatePreview);
     });
     document.getElementById('formDepense').addEventListener('submit', e => { e.preventDefault(); addDepense(); });
+    document.getElementById('formPaiement').addEventListener('submit', e => { e.preventDefault(); addPaiement(); });
+    document.getElementById('btnQuickPaie').addEventListener('click', quickAddPaiement);
 }
 
 function updatePreview() {
@@ -611,7 +620,11 @@ function initMonthFilters() {
     document.getElementById('nextD').addEventListener('click', () => changeMonth('filtreDepenseMois', 1, () => { renderDepenses(); renderCatSummary(); renderQuickStatsD(); }));
     document.getElementById('filtreResumeMois').addEventListener('change', renderResume);
     document.getElementById('prevR').addEventListener('click', () => changeMonth('filtreResumeMois', -1, renderResume));
-    document.getElementById('nextR').addEventListener('click', () => changeMonth('filtreResumeMois', 1, renderResume));
+       document.getElementById('nextR').addEventListener('click', () => changeMonth('filtreResumeMois', 1, renderResume));
+
+    document.getElementById('filtreAnneeP').addEventListener('change', renderPaiements);
+    document.getElementById('prevYearP').addEventListener('click', () => { const i = document.getElementById('filtreAnneeP'); i.value = parseInt(i.value) - 1; renderPaiements(); });
+    document.getElementById('nextYearP').addEventListener('click', () => { const i = document.getElementById('filtreAnneeP'); i.value = parseInt(i.value) + 1; renderPaiements(); });
 }
 
 function changeMonth(id, delta, cb) {
@@ -648,7 +661,34 @@ function renderDashboard() {
     const bar = document.getElementById('soldeBar');
     if (sol > 0) { badge.textContent = '✅ Positif'; badge.className = 'solde-badge positive'; bar.style.width = (rev > 0 ? Math.min((sol/rev)*100,100) : 0) + '%'; bar.style.background = 'linear-gradient(90deg,#00d2a0,#55efc4)'; }
     else if (sol < 0) { badge.textContent = '⚠️ Déficit'; badge.className = 'solde-badge negative'; bar.style.width = '100%'; bar.style.background = 'linear-gradient(90deg,#ff6b6b,#fd79a8)'; }
-    else { badge.textContent = '⚖️ Équilibre'; badge.className = 'solde-badge neutral'; bar.style.width = '50%'; }
+      else { badge.textContent = '⚖️ Équilibre'; badge.className = 'solde-badge neutral'; bar.style.width = '50%'; }
+
+    // Carte "Paie reçue ce mois"
+    const paieMois = getPaiementsForMonth(m);
+    const totalPaie = paieMois.reduce((s, p) => s + p.montant, 0);
+    const paieBadge = document.getElementById('paieBadge');
+    document.getElementById('paieRecue').textContent = formatM(totalPaie);
+
+    if (totalPaie > 0) {
+        paieBadge.textContent = '✅ Reçu';
+        paieBadge.className = 'solde-badge positive';
+        document.getElementById('paieLabel').textContent = 'Paie reçue ce mois';
+    } else {
+        // Voir la prévision (heures du mois précédent)
+        const prevMonth = getPreviousMonth(m);
+        const prevHoraires = getH(prevMonth);
+        const prevGain = prevHoraires.reduce((s, x) => s + x.gain, 0);
+        if (prevGain > 0) {
+            paieBadge.textContent = '⏳ À recevoir';
+            paieBadge.className = 'solde-badge warning';
+            document.getElementById('paieRecue').textContent = formatM(prevGain);
+            document.getElementById('paieLabel').textContent = 'Paie prévue (non reçue)';
+        } else {
+            paieBadge.textContent = '—';
+            paieBadge.className = 'solde-badge neutral';
+            document.getElementById('paieLabel').textContent = 'Aucune paie ce mois';
+        }
+    }
 }
 
 function renderHoraires() {
@@ -691,9 +731,12 @@ function renderCatSummary() {
 function renderResume() {
     const m = document.getElementById('filtreResumeMois').value;
     if (!m) return;
-    const h = getH(m), d = getD(m);
-    const rev = h.reduce((s,x) => s+x.gain,0), dep = d.reduce((s,x) => s+x.montant,0), sol = rev-dep;
-    const jrs = new Set(h.map(x => x.date)).size, mins = h.reduce((s,x) => s+x.minutes,0);
+       const h = getH(m), d = getD(m);
+    const paieMois = getPaiementsForMonth(m);
+    const paieRecue = paieMois.reduce((s, p) => s + p.montant, 0);
+    // Utiliser la paie reçue si disponible, sinon les gains estimés
+    const rev = paieRecue > 0 ? paieRecue : h.reduce((s,x) => s+x.gain,0);
+    const dep = d.reduce((s,x) => s+x.montant,0), sol = rev-dep;
 
     document.getElementById('bilanRevenus').textContent = formatM(rev);
     document.getElementById('bilanDepenses').textContent = formatM(dep);
@@ -745,11 +788,7 @@ function initSettings() {
     });
 
     document.getElementById('btnExport').addEventListener('click', () => {
-        const blob = new Blob([JSON.stringify({ horaires: App.horaires, depenses: App.depenses, settings: App.settings, exportDate: new Date().toISOString() }, null, 2)], { type: 'application/json' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob); a.download = `monbudget_${todayStr()}.json`; a.click();
-        showToast('📤 Exporté !');
-    });
+    const blob = new Blob([JSON.stringify({ horaires: App.horaires, depenses: App.depenses, paiements: App.paiements, settings: App.settings, exportDate: new Date().toISOString() }, null, 2)], { type: 'application/json' });
 
     document.getElementById('btnImport').addEventListener('change', e => {
         const file = e.target.files[0];
@@ -758,8 +797,9 @@ function initSettings() {
         reader.onload = ev => {
             try {
                 const data = JSON.parse(ev.target.result);
-                if (data.horaires) App.horaires = data.horaires;
+               if (data.horaires) App.horaires = data.horaires;
                 if (data.depenses) App.depenses = data.depenses;
+                if (data.paiements) App.paiements = data.paiements;
                 if (data.settings) App.settings = { ...App.settings, ...data.settings };
                 saveData(); setDefaultDates(); renderAll();
                 // Upload to cloud
@@ -774,12 +814,12 @@ function initSettings() {
         e.target.value = '';
     });
 
-    document.getElementById('btnReset').addEventListener('click', () => {
-        showConfirm('⚠️ Tout supprimer ?', 'Données locales ET cloud effacées.', async () => {
-            App.horaires = []; App.depenses = [];
-            saveData(); await cloudDeleteAll(); renderAll(); showToast('🗑️ Tout supprimé');
-        });
+   document.getElementById('btnReset').addEventListener('click', () => {
+    showConfirm('⚠️ Tout supprimer ?', 'Données locales ET cloud effacées.', async () => {
+        App.horaires = []; App.depenses = []; App.paiements = [];
+        saveData(); await cloudDeleteAll(); renderAll(); showToast('🗑️ Tout supprimé');
     });
+});
 }
 
 // ===== MODAL =====
@@ -807,3 +847,159 @@ function calcMinutes(d, f, p=0) { const [dh,dm]=d.split(':').map(Number); const 
 function formatDuree(m) { return `${Math.floor(m/60)}h ${String(m%60).padStart(2,'0')}`; }
 function formatM(a) { return a.toFixed(2).replace('.',',')+' '+App.settings.devise; }
 function formatDate(d) { const [y,m,j]=d.split('-'); return `${j}/${m}/${y}`; }
+
+// ===== PAIEMENTS =====
+function getPaiementsForMonth(monthStr) {
+    return App.paiements.filter(p => p.mois === monthStr);
+}
+
+function getPaiementsForYear(year) {
+    return App.paiements.filter(p => p.mois.startsWith(String(year)));
+}
+
+function getPreviousMonth(monthStr) {
+    const [y, m] = monthStr.split('-').map(Number);
+    const d = new Date(y, m - 2, 1);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+
+function getNextMonth(monthStr) {
+    const [y, m] = monthStr.split('-').map(Number);
+    const d = new Date(y, m, 1);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+
+function addPaiement() {
+    const mois = document.getElementById('moisPaiement').value;
+    const montant = parseFloat(document.getElementById('montantPaiement').value);
+    const description = document.getElementById('descriptionPaiement').value.trim();
+
+    if (!mois || !montant || montant <= 0) { showToast('⚠️ Remplissez mois et montant'); return; }
+
+    const paiement = { id: Date.now(), mois, montant, description, date: todayStr() };
+    App.paiements.push(paiement);
+    App.paiements.sort((a, b) => b.mois.localeCompare(a.mois));
+    saveData();
+    if (typeof cloudAddPaiement === 'function') cloudAddPaiement(paiement);
+    renderAll();
+    renderPaiements();
+    showToast(`✅ Paie de ${formatM(montant)} enregistrée !`);
+
+    document.getElementById('montantPaiement').value = '';
+    document.getElementById('descriptionPaiement').value = '';
+    toggleForm('formCardP', 'btnToggleFormP');
+}
+
+function quickAddPaiement() {
+    // Ajoute rapidement la paie prévue (heures du mois précédent) pour le mois en cours
+    const currentM = curM();
+    const prevM = getPreviousMonth(currentM);
+    const prevHoraires = getH(prevM);
+    const gain = prevHoraires.reduce((s, x) => s + x.gain, 0);
+
+    if (gain <= 0) { showToast('⚠️ Aucune heure le mois précédent'); return; }
+
+    // Vérifier s'il n'y a pas déjà une paie ce mois
+    const existing = getPaiementsForMonth(currentM);
+    if (existing.length > 0) {
+        showConfirm('Paie déjà enregistrée', `Vous avez déjà ${existing.length} paie(s) ce mois. En ajouter une nouvelle ?`, () => {
+            createQuickPaie(currentM, gain, prevM);
+        });
+    } else {
+        createQuickPaie(currentM, gain, prevM);
+    }
+}
+
+function createQuickPaie(mois, montant, moisSource) {
+    const paiement = {
+        id: Date.now(),
+        mois,
+        montant,
+        description: `Salaire ${formatMonthLong(moisSource)}`,
+        date: todayStr()
+    };
+    App.paiements.push(paiement);
+    App.paiements.sort((a, b) => b.mois.localeCompare(a.mois));
+    saveData();
+    if (typeof cloudAddPaiement === 'function') cloudAddPaiement(paiement);
+    renderAll();
+    renderPaiements();
+    showToast(`✨ Paie de ${formatM(montant)} ajoutée !`);
+}
+
+function deletePaiement(id) {
+    showConfirm('Supprimer ?', 'Supprimer ce paiement ?', () => {
+        App.paiements = App.paiements.filter(p => p.id !== id);
+        saveData();
+        if (typeof cloudDeletePaiement === 'function') cloudDeletePaiement(id);
+        renderAll();
+        renderPaiements();
+        showToast('🗑️ Supprimé');
+    });
+}
+
+function renderPaiements() {
+    const currentM = curM();
+    const prevM = getPreviousMonth(currentM);
+    const nextM = getNextMonth(currentM);
+
+    // Prévisions
+    const horairesActuel = getH(currentM);
+    const horairesPrec = getH(prevM);
+    const gainActuel = horairesActuel.reduce((s, x) => s + x.gain, 0);
+    const gainPrec = horairesPrec.reduce((s, x) => s + x.gain, 0);
+
+    document.getElementById('previsionActuel').textContent = formatM(gainActuel);
+    document.getElementById('previsionActuelSub').textContent = `Sera reçu en ${formatMonthShort(nextM)}`;
+    document.getElementById('previsionPrecedent').textContent = formatM(gainPrec);
+    document.getElementById('previsionPrecedentSub').textContent = `À recevoir en ${formatMonthShort(currentM)}`;
+
+    // Bouton quick
+    const btn = document.getElementById('btnQuickPaie');
+    if (gainPrec > 0) {
+        btn.style.display = 'block';
+        btn.textContent = `✨ Enregistrer ${formatM(gainPrec)} pour ${formatMonthShort(currentM)}`;
+    } else {
+        btn.style.display = 'none';
+    }
+
+    // Liste des paiements de l'année filtrée
+    const year = parseInt(document.getElementById('filtreAnneeP').value);
+    const paiements = getPaiementsForYear(year);
+    const total = paiements.reduce((s, p) => s + p.montant, 0);
+
+    document.getElementById('qsNbPaie').textContent = paiements.length;
+    document.getElementById('qsTotalPaie').textContent = formatM(total);
+    document.getElementById('qsMoyPaie').textContent = formatM(paiements.length ? total / paiements.length : 0);
+
+    const c = document.getElementById('listePaiements');
+    if (!paiements.length) {
+        c.innerHTML = '<p class="empty-state">💸 Aucun paiement cette année.</p>';
+        return;
+    }
+    c.innerHTML = paiements.map(p => `
+        <div class="list-item">
+            <div class="list-item-icon">💰</div>
+            <div class="list-item-body">
+                <div class="list-item-title">${p.description || 'Paie ' + formatMonthLong(p.mois)}</div>
+                <div class="list-item-sub">Reçu en ${formatMonthLong(p.mois)}</div>
+            </div>
+            <div class="list-item-right">
+                <span class="list-item-amount amount-green">${formatM(p.montant)}</span>
+                <button class="delete-btn" onclick="deletePaiement(${p.id})">🗑️</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function formatMonthShort(monthStr) {
+    const [y, m] = monthStr.split('-').map(Number);
+    const months = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
+    return `${months[m-1]} ${y}`;
+}
+
+function formatMonthLong(monthStr) {
+    const [y, m] = monthStr.split('-').map(Number);
+    const months = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+    return `${months[m-1]} ${y}`;
+}
