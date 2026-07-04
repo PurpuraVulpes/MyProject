@@ -466,26 +466,36 @@
 
                 <!-- Salary -->
                 <div class="settings-card">
-                    <h3>💼 Mon salaire</h3>
-                    <div class="form-field">
-                        <label>Taux horaire (€/h)</label>
-                        <div class="input-stepper">
-                            <button type="button" class="stepper-btn" id="tauxMinus">−</button>
-                            <input type="number" id="tauxHoraire" step="0.5" min="0" value="12.00" inputmode="decimal">
-                            <button type="button" class="stepper-btn" id="tauxPlus">+</button>
-                        </div>
-                    </div>
-                    <div class="form-field">
-                        <label>Devise</label>
-                        <div class="devise-grid">
-                            <button type="button" class="devise-btn active" data-devise="€">€</button>
-                            <button type="button" class="devise-btn" data-devise="$">$</button>
-                            <button type="button" class="devise-btn" data-devise="£">£</button>
-                            <button type="button" class="devise-btn" data-devise="CHF">CHF</button>
-                        </div>
-                    </div>
-                    <button class="submit-btn green" id="btnSaveSettings">💾 Sauvegarder</button>
-                </div>
+    <h3>💼 Mon salaire</h3>
+    <div class="form-field">
+        <label>Taux horaire (€/h)</label>
+        <div class="input-stepper">
+            <button type="button" class="stepper-btn" id="tauxMinus">−</button>
+            <input type="number" id="tauxHoraire" step="0.5" min="0" value="12.00" inputmode="decimal">
+            <button type="button" class="stepper-btn" id="tauxPlus">+</button>
+        </div>
+    </div>
+    <div class="form-field">
+        <label>Devise</label>
+        <div class="devise-grid">
+            <button type="button" class="devise-btn active" data-devise="€">€</button>
+            <button type="button" class="devise-btn" data-devise="$">$</button>
+            <button type="button" class="devise-btn" data-devise="£">£</button>
+            <button type="button" class="devise-btn" data-devise="CHF">CHF</button>
+        </div>
+    </div>
+    <div class="form-field">
+        <label>⏱️ Arrondi du temps de travail</label>
+        <div class="devise-grid">
+            <button type="button" class="arrondi-btn active" data-arrondi="none">Aucun</button>
+            <button type="button" class="arrondi-btn" data-arrondi="15">¼ h</button>
+            <button type="button" class="arrondi-btn" data-arrondi="30">½ h</button>
+            <button type="button" class="arrondi-btn" data-arrondi="60">1 h</button>
+        </div>
+        <small class="arrondi-hint">Arrondi à la valeur supérieure. Ex: 1h35 → 2h avec "½ h"</small>
+    </div>
+    <button class="submit-btn green" id="btnSaveSettings">💾 Sauvegarder</button>
+</div>
 
                 <!-- Data -->
                 <div class="settings-card">
