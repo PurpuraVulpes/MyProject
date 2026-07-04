@@ -1,6 +1,5 @@
 'use strict';
 
-// ===== STATE =====
 const App = {
     horaires: [],
     depenses: [],
@@ -8,37 +7,19 @@ const App = {
     activeTab: 'horaires'
 };
 
-// ===== PIN STATE =====
 let pinInput = '';
-let pinMode = 'unlock'; // 'unlock', 'setup', 'confirm', 'change-verify', 'change-new', 'change-confirm', 'remove'
-let pinSetupTemp = '';
-let pinAttempts = 0;
-
-// Modal PIN state
 let modalPinInput = '';
-let modalPinMode = ''; // 'setup', 'confirm', 'change-verify', 'change-new', 'change-confirm', 'remove'
+let modalPinMode = '';
 let modalPinTemp = '';
 
 const CATEGORIES = [
-    { emoji: '🍔', label: 'Alimentation' },
-    { emoji: '🏠', label: 'Loyer' },
-    { emoji: '🚗', label: 'Transport' },
-    { emoji: '📱', label: 'Téléphone' },
-    { emoji: '⚡', label: 'Énergie' },
-    { emoji: '🎮', label: 'Loisirs' },
-    { emoji: '👕', label: 'Vêtements' },
-    { emoji: '💊', label: 'Santé' },
-    { emoji: '🛒', label: 'Courses' },
-    { emoji: '📦', label: 'Abonnements' },
-    { emoji: '🎓', label: 'Éducation' },
-    { emoji: '🔧', label: 'Autre' }
+    {emoji:'🍔',label:'Alimentation'},{emoji:'🏠',label:'Loyer'},{emoji:'🚗',label:'Transport'},
+    {emoji:'📱',label:'Téléphone'},{emoji:'⚡',label:'Énergie'},{emoji:'🎮',label:'Loisirs'},
+    {emoji:'👕',label:'Vêtements'},{emoji:'💊',label:'Santé'},{emoji:'🛒',label:'Courses'},
+    {emoji:'📦',label:'Abonnements'},{emoji:'🎓',label:'Éducation'},{emoji:'🔧',label:'Autre'}
 ];
 
-const CAT_COLORS = [
-    '#9b59b6','#00d2a0','#e17055','#fdcb6e','#e84393',
-    '#a29bfe','#fd79a8','#74b9ff','#ff9f43','#55efc4',
-    '#c39bd3','#b2bec3'
-];
+const CAT_COLORS = ['#9b59b6','#00d2a0','#e17055','#fdcb6e','#e84393','#a29bfe','#fd79a8','#74b9ff','#ff9f43','#55efc4','#c39bd3','#b2bec3'];
 
 // ===== INIT =====
 document.addEventListener('DOMContentLoaded', () => {
@@ -52,73 +33,257 @@ document.addEventListener('DOMContentLoaded', () => {
     initMonthFilters();
     setDefaultDates();
     renderAll();
-    showInstallBanner();
     updateMonthLabel();
-    checkPin();
+
+    // Check if user is already logged in via Firebase
+    if (typeof auth !== 'undefined') {
+        auth.onAuthStateChanged(user => {
+            if (user && !isGuestMode) {
+                hideAuthScreen();
+                checkPinAfterAuth();
+            } else if (!isGuestMode) {
+                showAuthScreen();
+            }
+        });
+    } else {
+        // Firebase not loaded — local mode
+        isGuestMode = true;
+        hideAuthScreen();
+        checkPinAfterAuth();
+    }
 });
 
-// ===== PIN SYSTEM =====
-function getStoredPin() {
-    return localStorage.getItem('mb_pin');
+// ===== AUTH UI =====
+function showAuthScreen() {
+    document.getElementById('authScreen').classList.remove('hidden');
+    document.getElementById('appWrapper').classList.add('hidden');
+    document.getElementById('lockScreen').classList.add('hidden');
 }
 
-function setStoredPin(pin) {
-    localStorage.setItem('mb_pin', pin);
+function hideAuthScreen() {
+    document.getElementById('authScreen').classList.add('hidden');
 }
 
-function removeStoredPin() {
-    localStorage.removeItem('mb_pin');
+function showLogin() {
+    document.getElementById('loginForm').classList.remove('hidden');
+    document.getElementById('registerForm').classList.add('hidden');
+    document.getElementById('resetForm').classList.add('hidden');
+    clearAuthErrors();
 }
 
-function checkPin() {
+function showRegister() {
+    document.getElementById('loginForm').classList.add('hidden');
+    document.getElementById('registerForm').classList.remove('hidden');
+    document.getElementById('resetForm').classList.add('hidden');
+    clearAuthErrors();
+}
+
+function showResetPassword() {
+    document.getElementById('loginForm').classList.add('hidden');
+    document.getElementById('registerForm').classList.add('hidden');
+    document.getElementById('resetForm').classList.remove('hidden');
+    clearAuthErrors();
+}
+
+function clearAuthErrors() {
+    document.getElementById('loginError').textContent = '';
+    document.getElementById('regError').textContent = '';
+    document.getElementById('resetError').textContent = '';
+    document.getElementById('resetSuccess').textContent = '';
+}
+
+function togglePassword(inputId, btn) {
+    const input = document.getElementById(inputId);
+    if (input.type === 'password') {
+        input.type = 'text';
+        btn.textContent = '🙈';
+    } else {
+        input.type = 'password';
+        btn.textContent = '👁️';
+    }
+}
+
+function showAuthFromApp() {
+    showAuthScreen();
+    showLogin();
+}
+
+// ===== AUTH HANDLERS =====
+async function handleLogin() {
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    const errEl = document.getElementById('loginError');
+    const spinner = document.getElementById('loginSpinner');
+    const btnText = document.getElementById('loginBtnText');
+
+    if (!email || !password) { errEl.textContent = 'Remplissez tous les champs'; return; }
+
+    spinner.classList.add('show');
+    btnText.textContent = 'Connexion...';
+    errEl.textContent = '';
+
+    try {
+        isGuestMode = false;
+        await loginWithEmail(email, password);
+        hideAuthScreen();
+        checkPinAfterAuth();
+        showToast('✅ Connecté !');
+    } catch (e) {
+        errEl.textContent = getAuthError(e.code);
+    } finally {
+        spinner.classList.remove('show');
+        btnText.textContent = 'Se connecter';
+    }
+}
+
+async function handleRegister() {
+    const email = document.getElementById('regEmail').value.trim();
+    const password = document.getElementById('regPassword').value;
+    const confirm = document.getElementById('regPasswordConfirm').value;
+    const errEl = document.getElementById('regError');
+    const spinner = document.getElementById('regSpinner');
+    const btnText = document.getElementById('regBtnText');
+
+    if (!email || !password || !confirm) { errEl.textContent = 'Remplissez tous les champs'; return; }
+    if (password.length < 6) { errEl.textContent = 'Le mot de passe doit faire 6 caractères minimum'; return; }
+    if (password !== confirm) { errEl.textContent = 'Les mots de passe ne correspondent pas'; return; }
+
+    spinner.classList.add('show');
+    btnText.textContent = 'Création...';
+    errEl.textContent = '';
+
+    try {
+        isGuestMode = false;
+        await registerWithEmail(email, password);
+        hideAuthScreen();
+        checkPinAfterAuth();
+        showToast('🎉 Compte créé et connecté !');
+    } catch (e) {
+        errEl.textContent = getAuthError(e.code);
+    } finally {
+        spinner.classList.remove('show');
+        btnText.textContent = 'Créer mon compte';
+    }
+}
+
+async function handleResetPassword() {
+    const email = document.getElementById('resetEmail').value.trim();
+    const errEl = document.getElementById('resetError');
+    const successEl = document.getElementById('resetSuccess');
+    const spinner = document.getElementById('resetSpinner');
+    const btnText = document.getElementById('resetBtnText');
+
+    if (!email) { errEl.textContent = 'Entrez votre email'; return; }
+
+    spinner.classList.add('show');
+    btnText.textContent = 'Envoi...';
+    errEl.textContent = '';
+    successEl.textContent = '';
+
+    try {
+        await resetPassword(email);
+        successEl.textContent = '📧 Email envoyé ! Vérifiez votre boîte de réception.';
+    } catch (e) {
+        errEl.textContent = getAuthError(e.code);
+    } finally {
+        spinner.classList.remove('show');
+        btnText.textContent = 'Envoyer le lien';
+    }
+}
+
+function handleGuestMode() {
+    isGuestMode = true;
+    hideAuthScreen();
+    updateSyncUI('offline');
+    checkPinAfterAuth();
+}
+
+async function handleLogout() {
+    showConfirm('🚪 Se déconnecter ?', 'Vos données locales seront conservées.', async () => {
+        try {
+            await logout();
+            updateSyncUI('offline');
+            showAuthScreen();
+            showLogin();
+            showToast('👋 Déconnecté');
+        } catch (e) {
+            showToast('❌ Erreur de déconnexion');
+        }
+    });
+}
+
+async function manualSync() {
+    if (!currentUser || isGuestMode) {
+        showToast('⚠️ Connectez-vous d\'abord');
+        return;
+    }
+
+    updateSyncUI('syncing');
+
+    try {
+        localStorage.removeItem('mb_uploaded_' + currentUser.uid);
+        await uploadLocalDataIfNeeded(currentUser.uid);
+        showToast('🔄 Synchronisé !');
+    } catch (e) {
+        showToast('❌ Erreur de synchronisation');
+    }
+
+    updateSyncUI('online', currentUser.email);
+}
+
+function getAuthError(code) {
+    const errors = {
+        'auth/email-already-in-use': 'Cet email est déjà utilisé',
+        'auth/invalid-email': 'Email invalide',
+        'auth/user-not-found': 'Aucun compte avec cet email',
+        'auth/wrong-password': 'Mot de passe incorrect',
+        'auth/weak-password': 'Mot de passe trop faible (min 6 car.)',
+        'auth/too-many-requests': 'Trop de tentatives, réessayez plus tard',
+        'auth/network-request-failed': 'Erreur réseau, vérifiez votre connexion',
+        'auth/invalid-credential': 'Email ou mot de passe incorrect'
+    };
+    return errors[code] || 'Erreur : ' + code;
+}
+
+// ===== PIN AFTER AUTH =====
+function checkPinAfterAuth() {
     const pin = getStoredPin();
     if (pin) {
-        // PIN exists -> show lock screen
         showLockScreen();
     } else {
-        // No PIN -> go straight to app
         unlockApp();
     }
 }
 
+// ===== PIN SYSTEM =====
+function getStoredPin() { return localStorage.getItem('mb_pin'); }
+function setStoredPin(pin) { localStorage.setItem('mb_pin', pin); }
+function removeStoredPin() { localStorage.removeItem('mb_pin'); }
+
 function showLockScreen() {
     document.getElementById('lockScreen').classList.remove('hidden');
-    document.getElementById('appWrapper').style.display = 'none';
-    document.getElementById('lockIcon').textContent = '🔒';
-    document.getElementById('lockTitle').textContent = 'Entrez votre code';
-    document.getElementById('lockSubtitle').textContent = '6 chiffres requis';
-    document.getElementById('forgotBtn').style.display = 'block';
+    document.getElementById('appWrapper').classList.add('hidden');
     pinInput = '';
-    pinMode = 'unlock';
-    pinAttempts = 0;
-    updateDots('pinDots', pinInput);
+    updateDots('pinDots', '');
     document.getElementById('pinError').textContent = '';
 }
 
 function unlockApp() {
     document.getElementById('lockScreen').classList.add('hidden');
-    document.getElementById('appWrapper').style.display = 'flex';
+    document.getElementById('appWrapper').classList.remove('hidden');
+    renderAll();
 }
 
 function lockApp() {
-    const pin = getStoredPin();
-    if (pin) {
-        showLockScreen();
-    } else {
-        showToast('🔓 Aucun code défini');
-    }
+    if (getStoredPin()) showLockScreen();
+    else showToast('🔓 Aucun code défini');
 }
 
-// Lock screen keypad
 function pressKey(num) {
     if (pinInput.length >= 6) return;
     pinInput += num;
     updateDots('pinDots', pinInput);
-
-    // Haptic-like visual feedback
-    if (pinInput.length === 6) {
-        setTimeout(() => handlePinComplete(), 200);
-    }
+    if (pinInput.length === 6) setTimeout(handlePinComplete, 200);
 }
 
 function pressDelete() {
@@ -128,77 +293,41 @@ function pressDelete() {
 }
 
 function handlePinComplete() {
-    const stored = getStoredPin();
-
-    if (pinMode === 'unlock') {
-        if (pinInput === stored) {
-            // Success!
-            setDotsState('pinDots', 'success');
-            setTimeout(() => {
-                unlockApp();
-            }, 400);
-        } else {
-            // Wrong PIN
-            pinAttempts++;
-            setDotsState('pinDots', 'error');
-            document.getElementById('pinError').textContent =
-                pinAttempts >= 3
-                    ? `Code incorrect (${pinAttempts} essais)`
-                    : 'Code incorrect';
-
-            setTimeout(() => {
-                pinInput = '';
-                updateDots('pinDots', pinInput);
-            }, 500);
-        }
+    if (pinInput === getStoredPin()) {
+        setDotsState('pinDots', 'success');
+        setTimeout(unlockApp, 400);
+    } else {
+        setDotsState('pinDots', 'error');
+        document.getElementById('pinError').textContent = 'Code incorrect';
+        setTimeout(() => { pinInput = ''; updateDots('pinDots', ''); }, 500);
     }
 }
 
 function forgotPin() {
-    const secret = prompt(
-        '⚠️ Réinitialisation du code PIN\n\n' +
-        'Tapez RESET pour supprimer le code.\n' +
-        '(Vos données ne seront pas effacées)'
-    );
-
-    if (secret && secret.toUpperCase() === 'RESET') {
-        removeStoredPin();
-        unlockApp();
-        showToast('🔓 Code PIN supprimé');
-    }
+    const s = prompt('⚠️ Tapez RESET pour supprimer le code PIN\n(Données conservées)');
+    if (s && s.toUpperCase() === 'RESET') { removeStoredPin(); unlockApp(); showToast('🔓 Code supprimé'); }
 }
 
-function updateDots(containerId, value) {
-    const dots = document.querySelectorAll(`#${containerId} .dot`);
-    dots.forEach((d, i) => {
+function updateDots(id, val) {
+    document.querySelectorAll(`#${id} .dot`).forEach((d, i) => {
         d.classList.remove('filled', 'error', 'success');
-        if (i < value.length) d.classList.add('filled');
+        if (i < val.length) d.classList.add('filled');
     });
 }
 
-function setDotsState(containerId, state) {
-    const dots = document.querySelectorAll(`#${containerId} .dot`);
-    dots.forEach(d => {
+function setDotsState(id, state) {
+    document.querySelectorAll(`#${id} .dot`).forEach(d => {
         d.classList.remove('filled', 'error', 'success');
         d.classList.add(state);
     });
 }
 
-// ===== PIN SETUP (in settings modal) =====
+// ===== PIN SETTINGS =====
 function initPinSettings() {
     updatePinStatus();
-
-    document.getElementById('btnSetPin').addEventListener('click', () => {
-        openPinModal('setup');
-    });
-
-    document.getElementById('btnChangePin').addEventListener('click', () => {
-        openPinModal('change-verify');
-    });
-
-    document.getElementById('btnRemovePin').addEventListener('click', () => {
-        openPinModal('remove');
-    });
+    document.getElementById('btnSetPin').addEventListener('click', () => openPinModal('setup'));
+    document.getElementById('btnChangePin').addEventListener('click', () => openPinModal('change-verify'));
+    document.getElementById('btnRemovePin').addEventListener('click', () => openPinModal('remove'));
 }
 
 function updatePinStatus() {
@@ -206,72 +335,42 @@ function updatePinStatus() {
     const icon = document.getElementById('pinStatusIcon');
     const text = document.getElementById('pinStatusText');
     const sub = document.getElementById('pinStatusSub');
-    const status = document.querySelector('.pin-status');
-    const setBtn = document.getElementById('btnSetPin');
-    const changeBtn = document.getElementById('btnChangePin');
-    const removeBtn = document.getElementById('btnRemovePin');
+    const wrap = document.getElementById('pinStatusWrap');
 
     if (pin) {
-        icon.textContent = '🔒';
-        text.textContent = 'Code PIN activé';
-        sub.textContent = 'Votre app est protégée';
-        status.classList.add('active-pin');
-        setBtn.style.display = 'none';
-        changeBtn.style.display = 'block';
-        removeBtn.style.display = 'block';
+        icon.textContent = '🔒'; text.textContent = 'Code PIN activé';
+        sub.textContent = 'App protégée'; wrap.classList.add('active-pin');
+        document.getElementById('btnSetPin').style.display = 'none';
+        document.getElementById('btnChangePin').style.display = 'block';
+        document.getElementById('btnRemovePin').style.display = 'block';
     } else {
-        icon.textContent = '🔓';
-        text.textContent = 'Aucun code défini';
-        sub.textContent = 'Votre app n\'est pas protégée';
-        status.classList.remove('active-pin');
-        setBtn.style.display = 'block';
-        changeBtn.style.display = 'none';
-        removeBtn.style.display = 'none';
+        icon.textContent = '🔓'; text.textContent = 'Aucun code défini';
+        sub.textContent = 'App non protégée'; wrap.classList.remove('active-pin');
+        document.getElementById('btnSetPin').style.display = 'block';
+        document.getElementById('btnChangePin').style.display = 'none';
+        document.getElementById('btnRemovePin').style.display = 'none';
     }
 }
 
 function openPinModal(mode) {
-    modalPinMode = mode;
-    modalPinInput = '';
-    modalPinTemp = '';
+    modalPinMode = mode; modalPinInput = ''; modalPinTemp = '';
     document.getElementById('modalPinError').textContent = '';
     updateDots('modalPinDots', '');
-
-    const title = document.getElementById('pinModalTitle');
-    const msg = document.getElementById('pinModalMsg');
-
-    switch(mode) {
-        case 'setup':
-            title.textContent = '🔐 Nouveau code PIN';
-            msg.textContent = 'Entrez un code à 6 chiffres';
-            break;
-        case 'change-verify':
-            title.textContent = '🔄 Changer le code';
-            msg.textContent = 'Entrez votre code actuel';
-            break;
-        case 'remove':
-            title.textContent = '🗑️ Supprimer le code';
-            msg.textContent = 'Entrez votre code actuel pour confirmer';
-            break;
-    }
-
+    const t = document.getElementById('pinModalTitle');
+    const m = document.getElementById('pinModalMsg');
+    if (mode === 'setup') { t.textContent = '🔐 Nouveau code'; m.textContent = 'Entrez 6 chiffres'; }
+    else if (mode === 'change-verify') { t.textContent = '🔄 Changer'; m.textContent = 'Code actuel'; }
+    else if (mode === 'remove') { t.textContent = '🗑️ Supprimer'; m.textContent = 'Entrez votre code'; }
     document.getElementById('pinModal').classList.add('show');
 }
 
-function closePinModal() {
-    document.getElementById('pinModal').classList.remove('show');
-    modalPinInput = '';
-    modalPinTemp = '';
-}
+function closePinModal() { document.getElementById('pinModal').classList.remove('show'); }
 
 function modalPressKey(num) {
     if (modalPinInput.length >= 6) return;
     modalPinInput += num;
     updateDots('modalPinDots', modalPinInput);
-
-    if (modalPinInput.length === 6) {
-        setTimeout(() => handleModalPinComplete(), 200);
-    }
+    if (modalPinInput.length === 6) setTimeout(handleModalPinComplete, 200);
 }
 
 function modalPressDelete() {
@@ -281,116 +380,57 @@ function modalPressDelete() {
 }
 
 function handleModalPinComplete() {
-    const title = document.getElementById('pinModalTitle');
-    const msg = document.getElementById('pinModalMsg');
+    const t = document.getElementById('pinModalTitle');
+    const m = document.getElementById('pinModalMsg');
     const err = document.getElementById('modalPinError');
 
-    switch(modalPinMode) {
+    switch (modalPinMode) {
         case 'setup':
-            // First entry — save temp and ask to confirm
-            modalPinTemp = modalPinInput;
-            modalPinInput = '';
-            modalPinMode = 'confirm';
-            title.textContent = '🔐 Confirmez le code';
-            msg.textContent = 'Entrez le même code une 2ème fois';
-            updateDots('modalPinDots', '');
-            break;
-
+            modalPinTemp = modalPinInput; modalPinInput = ''; modalPinMode = 'confirm';
+            t.textContent = '🔐 Confirmer'; m.textContent = 'Même code une 2ème fois';
+            updateDots('modalPinDots', ''); break;
         case 'confirm':
             if (modalPinInput === modalPinTemp) {
-                setDotsState('modalPinDots', 'success');
-                setStoredPin(modalPinTemp);
-                setTimeout(() => {
-                    closePinModal();
-                    updatePinStatus();
-                    showToast('🔒 Code PIN activé !');
-                }, 500);
+                setDotsState('modalPinDots', 'success'); setStoredPin(modalPinTemp);
+                setTimeout(() => { closePinModal(); updatePinStatus(); showToast('🔒 Code activé !'); }, 500);
             } else {
-                setDotsState('modalPinDots', 'error');
-                err.textContent = 'Les codes ne correspondent pas';
-                setTimeout(() => {
-                    modalPinInput = '';
-                    modalPinMode = 'setup';
-                    modalPinTemp = '';
-                    title.textContent = '🔐 Nouveau code PIN';
-                    msg.textContent = 'Entrez un code à 6 chiffres';
-                    updateDots('modalPinDots', '');
-                    err.textContent = '';
-                }, 800);
-            }
-            break;
-
+                setDotsState('modalPinDots', 'error'); err.textContent = 'Codes différents';
+                setTimeout(() => { modalPinInput = ''; modalPinMode = 'setup'; modalPinTemp = '';
+                    t.textContent = '🔐 Nouveau code'; m.textContent = 'Entrez 6 chiffres';
+                    updateDots('modalPinDots', ''); err.textContent = ''; }, 800);
+            } break;
         case 'change-verify':
             if (modalPinInput === getStoredPin()) {
                 setDotsState('modalPinDots', 'success');
-                setTimeout(() => {
-                    modalPinInput = '';
-                    modalPinMode = 'change-new';
-                    title.textContent = '🔐 Nouveau code';
-                    msg.textContent = 'Entrez votre nouveau code à 6 chiffres';
-                    updateDots('modalPinDots', '');
-                }, 400);
+                setTimeout(() => { modalPinInput = ''; modalPinMode = 'change-new';
+                    t.textContent = '🔐 Nouveau code'; m.textContent = 'Entrez 6 chiffres';
+                    updateDots('modalPinDots', ''); }, 400);
             } else {
-                setDotsState('modalPinDots', 'error');
-                err.textContent = 'Code incorrect';
-                setTimeout(() => {
-                    modalPinInput = '';
-                    updateDots('modalPinDots', '');
-                }, 500);
-            }
-            break;
-
+                setDotsState('modalPinDots', 'error'); err.textContent = 'Code incorrect';
+                setTimeout(() => { modalPinInput = ''; updateDots('modalPinDots', ''); }, 500);
+            } break;
         case 'change-new':
-            modalPinTemp = modalPinInput;
-            modalPinInput = '';
-            modalPinMode = 'change-confirm';
-            title.textContent = '🔐 Confirmez';
-            msg.textContent = 'Entrez le nouveau code une 2ème fois';
-            updateDots('modalPinDots', '');
-            break;
-
+            modalPinTemp = modalPinInput; modalPinInput = ''; modalPinMode = 'change-confirm';
+            t.textContent = '🔐 Confirmer'; m.textContent = 'Même code une 2ème fois';
+            updateDots('modalPinDots', ''); break;
         case 'change-confirm':
             if (modalPinInput === modalPinTemp) {
-                setDotsState('modalPinDots', 'success');
-                setStoredPin(modalPinTemp);
-                setTimeout(() => {
-                    closePinModal();
-                    updatePinStatus();
-                    showToast('🔒 Code PIN modifié !');
-                }, 500);
+                setDotsState('modalPinDots', 'success'); setStoredPin(modalPinTemp);
+                setTimeout(() => { closePinModal(); updatePinStatus(); showToast('🔒 Code modifié !'); }, 500);
             } else {
-                setDotsState('modalPinDots', 'error');
-                err.textContent = 'Les codes ne correspondent pas';
-                setTimeout(() => {
-                    modalPinInput = '';
-                    modalPinMode = 'change-new';
-                    modalPinTemp = '';
-                    title.textContent = '🔐 Nouveau code';
-                    msg.textContent = 'Entrez votre nouveau code à 6 chiffres';
-                    updateDots('modalPinDots', '');
-                    err.textContent = '';
-                }, 800);
-            }
-            break;
-
+                setDotsState('modalPinDots', 'error'); err.textContent = 'Codes différents';
+                setTimeout(() => { modalPinInput = ''; modalPinMode = 'change-new'; modalPinTemp = '';
+                    t.textContent = '🔐 Nouveau code'; m.textContent = 'Entrez 6 chiffres';
+                    updateDots('modalPinDots', ''); err.textContent = ''; }, 800);
+            } break;
         case 'remove':
             if (modalPinInput === getStoredPin()) {
-                setDotsState('modalPinDots', 'success');
-                removeStoredPin();
-                setTimeout(() => {
-                    closePinModal();
-                    updatePinStatus();
-                    showToast('🔓 Code PIN supprimé');
-                }, 500);
+                setDotsState('modalPinDots', 'success'); removeStoredPin();
+                setTimeout(() => { closePinModal(); updatePinStatus(); showToast('🔓 Code supprimé'); }, 500);
             } else {
-                setDotsState('modalPinDots', 'error');
-                err.textContent = 'Code incorrect';
-                setTimeout(() => {
-                    modalPinInput = '';
-                    updateDots('modalPinDots', '');
-                }, 500);
-            }
-            break;
+                setDotsState('modalPinDots', 'error'); err.textContent = 'Code incorrect';
+                setTimeout(() => { modalPinInput = ''; updateDots('modalPinDots', ''); }, 500);
+            } break;
     }
 }
 
@@ -403,7 +443,7 @@ function loadData() {
         if (h) App.horaires = JSON.parse(h);
         if (d) App.depenses = JSON.parse(d);
         if (s) App.settings = { ...App.settings, ...JSON.parse(s) };
-    } catch(e) { console.error(e); }
+    } catch (e) { console.error(e); }
 }
 
 function saveData() {
@@ -423,13 +463,11 @@ function goTab(tab) {
     App.activeTab = tab;
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
     document.querySelectorAll('.tab-section').forEach(s => s.classList.toggle('active', s.id === 'tab-' + tab));
-    document.querySelector('.dashboard').style.display = 'grid';
     document.getElementById('mainScroll').scrollTo({ top: 0, behavior: 'smooth' });
     if (tab === 'resume') renderResume();
     if (tab === 'depenses') renderCatSummary();
 }
 
-// ===== TABS (form toggles) =====
 function initTabs() {
     document.getElementById('btnToggleFormH').addEventListener('click', () => toggleForm('formCardH', 'btnToggleFormH'));
     document.getElementById('btnToggleFormD').addEventListener('click', () => toggleForm('formCardD', 'btnToggleFormD'));
@@ -444,26 +482,20 @@ function toggleForm(cardId, btnId) {
     if (collapsed) setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
 }
 
-// ===== BUILD CATEGORIES =====
 function buildCategoryGrid() {
-    document.getElementById('catGrid').innerHTML = CATEGORIES.map(c => `
-        <div class="cat-chip" data-cat="${c.emoji} ${c.label}" onclick="selectCat(this, '${c.emoji} ${c.label}')">
-            <span class="cat-emoji">${c.emoji}</span>
-            ${c.label}
-        </div>
-    `).join('');
+    document.getElementById('catGrid').innerHTML = CATEGORIES.map(c =>
+        `<div class="cat-chip" onclick="selectCat(this,'${c.emoji} ${c.label}')"><span class="cat-emoji">${c.emoji}</span>${c.label}</div>`
+    ).join('');
 }
 
-function selectCat(el, value) {
+function selectCat(el, val) {
     document.querySelectorAll('.cat-chip').forEach(c => c.classList.remove('selected'));
     el.classList.add('selected');
-    document.getElementById('categorieDepense').value = value;
+    document.getElementById('categorieDepense').value = val;
 }
 
-// ===== DEFAULT DATES =====
 function setDefaultDates() {
-    const today = todayStr();
-    const month = today.substring(0, 7);
+    const today = todayStr(), month = today.substring(0, 7);
     document.getElementById('dateHoraire').value = today;
     document.getElementById('dateDepense').value = today;
     document.getElementById('filtreHoraireMois').value = month;
@@ -478,13 +510,13 @@ function todayStr() { return new Date().toISOString().split('T')[0]; }
 function updateMonthLabel() {
     const now = new Date();
     const months = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
-    document.getElementById('currentMonthLabel').textContent = `${months[now.getMonth()]} ${now.getFullYear()}`;
+    document.getElementById('currentMonthLabel') && (document.getElementById('currentMonthLabel').textContent = `${months[now.getMonth()]} ${now.getFullYear()}`);
 }
 
 // ===== FORMS =====
 function initForms() {
     document.getElementById('formHoraire').addEventListener('submit', e => { e.preventDefault(); addHoraire(); });
-    ['heureDebut','heureFin','pauseMinutes'].forEach(id => {
+    ['heureDebut', 'heureFin', 'pauseMinutes'].forEach(id => {
         document.getElementById(id).addEventListener('input', updatePreview);
     });
     document.getElementById('formDepense').addEventListener('submit', e => { e.preventDefault(); addDepense(); });
@@ -512,11 +544,15 @@ function addHoraire() {
     const minutes = calcMinutes(debut, fin, pause);
     if (minutes <= 0) { showToast('⚠️ Durée invalide'); return; }
 
-    App.horaires.push({ id: Date.now(), date, debut, fin, pause, minutes, note, gain: (minutes / 60) * App.settings.tauxHoraire });
+    const horaire = { id: Date.now(), date, debut, fin, pause, minutes, note, gain: (minutes / 60) * App.settings.tauxHoraire };
+
+    App.horaires.push(horaire);
     App.horaires.sort((a, b) => b.date.localeCompare(a.date));
     saveData();
+    cloudAddHoraire(horaire);
     renderAll();
     showToast(`✅ ${formatDuree(minutes)} ajouté !`);
+
     document.getElementById('heureDebut').value = '';
     document.getElementById('heureFin').value = '';
     document.getElementById('pauseMinutes').value = '0';
@@ -535,11 +571,15 @@ function addDepense() {
     if (!date || !montant || montant <= 0) { showToast('⚠️ Remplissez date et montant'); return; }
     if (!categorie) { showToast('⚠️ Choisissez une catégorie'); return; }
 
-    App.depenses.push({ id: Date.now(), date, montant, categorie, description });
+    const depense = { id: Date.now(), date, montant, categorie, description };
+
+    App.depenses.push(depense);
     App.depenses.sort((a, b) => b.date.localeCompare(a.date));
     saveData();
+    cloudAddDepense(depense);
     renderAll();
     showToast(`✅ ${formatM(montant)} ajouté !`);
+
     document.getElementById('montantDepense').value = '';
     document.getElementById('descriptionDepense').value = '';
     document.querySelectorAll('.cat-chip').forEach(c => c.classList.remove('selected'));
@@ -550,14 +590,14 @@ function addDepense() {
 function deleteHoraire(id) {
     showConfirm('Supprimer ?', 'Supprimer cet horaire ?', () => {
         App.horaires = App.horaires.filter(h => h.id !== id);
-        saveData(); renderAll(); showToast('🗑️ Supprimé');
+        saveData(); cloudDeleteHoraire(id); renderAll(); showToast('🗑️ Supprimé');
     });
 }
 
 function deleteDepense(id) {
     showConfirm('Supprimer ?', 'Supprimer cette dépense ?', () => {
         App.depenses = App.depenses.filter(d => d.id !== id);
-        saveData(); renderAll(); showToast('🗑️ Supprimé');
+        saveData(); cloudDeleteDepense(id); renderAll(); showToast('🗑️ Supprimé');
     });
 }
 
@@ -566,18 +606,16 @@ function initMonthFilters() {
     document.getElementById('filtreHoraireMois').addEventListener('change', () => { renderHoraires(); renderQuickStatsH(); });
     document.getElementById('prevH').addEventListener('click', () => changeMonth('filtreHoraireMois', -1, () => { renderHoraires(); renderQuickStatsH(); }));
     document.getElementById('nextH').addEventListener('click', () => changeMonth('filtreHoraireMois', 1, () => { renderHoraires(); renderQuickStatsH(); }));
-
     document.getElementById('filtreDepenseMois').addEventListener('change', () => { renderDepenses(); renderCatSummary(); renderQuickStatsD(); });
     document.getElementById('prevD').addEventListener('click', () => changeMonth('filtreDepenseMois', -1, () => { renderDepenses(); renderCatSummary(); renderQuickStatsD(); }));
     document.getElementById('nextD').addEventListener('click', () => changeMonth('filtreDepenseMois', 1, () => { renderDepenses(); renderCatSummary(); renderQuickStatsD(); }));
-
     document.getElementById('filtreResumeMois').addEventListener('change', renderResume);
     document.getElementById('prevR').addEventListener('click', () => changeMonth('filtreResumeMois', -1, renderResume));
     document.getElementById('nextR').addEventListener('click', () => changeMonth('filtreResumeMois', 1, renderResume));
 }
 
-function changeMonth(inputId, delta, cb) {
-    const input = document.getElementById(inputId);
+function changeMonth(id, delta, cb) {
+    const input = document.getElementById(id);
     if (!input.value) return;
     const [y, m] = input.value.split('-').map(Number);
     const d = new Date(y, m - 1 + delta, 1);
@@ -585,177 +623,132 @@ function changeMonth(inputId, delta, cb) {
     cb();
 }
 
-function getHorairesForMonth(m) { return App.horaires.filter(h => h.date.startsWith(m)); }
-function getDepensesForMonth(m) { return App.depenses.filter(d => d.date.startsWith(m)); }
-function currentMonth() { return todayStr().substring(0, 7); }
+function getH(m) { return App.horaires.filter(h => h.date.startsWith(m)); }
+function getD(m) { return App.depenses.filter(d => d.date.startsWith(m)); }
+function curM() { return todayStr().substring(0, 7); }
 
-// ===== RENDER ALL =====
-function renderAll() {
-    renderDashboard();
-    renderHoraires();
-    renderQuickStatsH();
-    renderDepenses();
-    renderCatSummary();
-    renderQuickStatsD();
-}
+// ===== RENDERS =====
+function renderAll() { renderDashboard(); renderHoraires(); renderQuickStatsH(); renderDepenses(); renderCatSummary(); renderQuickStatsD(); }
 
-// ===== DASHBOARD =====
 function renderDashboard() {
-    const m = currentMonth();
-    const horaires = getHorairesForMonth(m);
-    const depenses = getDepensesForMonth(m);
+    const m = curM(), h = getH(m), d = getD(m);
+    const mins = h.reduce((s, x) => s + x.minutes, 0);
+    const rev = h.reduce((s, x) => s + x.gain, 0);
+    const dep = d.reduce((s, x) => s + x.montant, 0);
+    const sol = rev - dep;
+    const jrs = new Set(h.map(x => x.date)).size;
 
-    const totalMins = horaires.reduce((s, h) => s + h.minutes, 0);
-    const revenus = horaires.reduce((s, h) => s + h.gain, 0);
-    const totalDep = depenses.reduce((s, d) => s + d.montant, 0);
-    const solde = revenus - totalDep;
-    const jours = new Set(horaires.map(h => h.date)).size;
-
-    document.getElementById('totalRevenus').textContent = formatM(revenus);
-    document.getElementById('totalDepenses').textContent = formatM(totalDep);
-    document.getElementById('totalHeures').textContent = formatDuree(totalMins);
-    document.getElementById('totalJours').textContent = jours;
+    document.getElementById('totalRevenus').textContent = formatM(rev);
+    document.getElementById('totalDepenses').textContent = formatM(dep);
+    document.getElementById('totalHeures').textContent = formatDuree(mins);
+    document.getElementById('totalJours').textContent = jrs;
+    document.getElementById('solde').textContent = formatM(Math.abs(sol));
 
     const badge = document.getElementById('soldeBadge');
     const bar = document.getElementById('soldeBar');
-    document.getElementById('solde').textContent = formatM(Math.abs(solde));
-
-    if (solde > 0) {
-        badge.textContent = '✅ Positif'; badge.className = 'solde-badge positive';
-        bar.style.width = (revenus > 0 ? Math.min((solde / revenus) * 100, 100) : 0) + '%';
-        bar.style.background = 'linear-gradient(90deg, #00d2a0, #55efc4)';
-    } else if (solde < 0) {
-        badge.textContent = '⚠️ Déficit'; badge.className = 'solde-badge negative';
-        bar.style.width = '100%'; bar.style.background = 'linear-gradient(90deg, #ff6b6b, #fd79a8)';
-    } else {
-        badge.textContent = '⚖️ Équilibre'; badge.className = 'solde-badge neutral'; bar.style.width = '50%';
-    }
+    if (sol > 0) { badge.textContent = '✅ Positif'; badge.className = 'solde-badge positive'; bar.style.width = (rev > 0 ? Math.min((sol/rev)*100,100) : 0) + '%'; bar.style.background = 'linear-gradient(90deg,#00d2a0,#55efc4)'; }
+    else if (sol < 0) { badge.textContent = '⚠️ Déficit'; badge.className = 'solde-badge negative'; bar.style.width = '100%'; bar.style.background = 'linear-gradient(90deg,#ff6b6b,#fd79a8)'; }
+    else { badge.textContent = '⚖️ Équilibre'; badge.className = 'solde-badge neutral'; bar.style.width = '50%'; }
 }
 
 function renderHoraires() {
-    const m = document.getElementById('filtreHoraireMois').value;
-    const horaires = getHorairesForMonth(m);
-    const c = document.getElementById('listeHoraires');
-    if (!horaires.length) { c.innerHTML = '<p class="empty-state">😴 Aucun horaire ce mois.<br><small>Appuyez sur "+ Ajouter"</small></p>'; return; }
-    c.innerHTML = horaires.map(h => `<div class="list-item"><div class="list-item-icon">📅</div><div class="list-item-body"><div class="list-item-title">${formatDate(h.date)} · ${h.debut} – ${h.fin}</div><div class="list-item-sub">${formatDuree(h.minutes)}${h.pause > 0 ? ' (pause ' + h.pause + 'min)' : ''}${h.note ? ' · ' + h.note : ''}</div></div><div class="list-item-right"><span class="list-item-amount amount-green">${formatM(h.gain)}</span><button class="delete-btn" onclick="deleteHoraire(${h.id})">🗑️</button></div></div>`).join('');
+    const m = document.getElementById('filtreHoraireMois').value, h = getH(m), c = document.getElementById('listeHoraires');
+    if (!h.length) { c.innerHTML = '<p class="empty-state">😴 Aucun horaire ce mois.</p>'; return; }
+    c.innerHTML = h.map(x => `<div class="list-item"><div class="list-item-icon">📅</div><div class="list-item-body"><div class="list-item-title">${formatDate(x.date)} · ${x.debut} – ${x.fin}</div><div class="list-item-sub">${formatDuree(x.minutes)}${x.pause>0?' ('+x.pause+'min pause)':''}${x.note?' · '+x.note:''}</div></div><div class="list-item-right"><span class="list-item-amount amount-green">${formatM(x.gain)}</span><button class="delete-btn" onclick="deleteHoraire(${x.id})">🗑️</button></div></div>`).join('');
 }
 
 function renderQuickStatsH() {
-    const m = document.getElementById('filtreHoraireMois').value;
-    const horaires = getHorairesForMonth(m);
-    document.getElementById('qsJoursH').textContent = new Set(horaires.map(h => h.date)).size;
-    document.getElementById('qsHeuresH').textContent = formatDuree(horaires.reduce((s, h) => s + h.minutes, 0));
-    document.getElementById('qsGainH').textContent = formatM(horaires.reduce((s, h) => s + h.gain, 0));
+    const m = document.getElementById('filtreHoraireMois').value, h = getH(m);
+    document.getElementById('qsJoursH').textContent = new Set(h.map(x => x.date)).size;
+    document.getElementById('qsHeuresH').textContent = formatDuree(h.reduce((s, x) => s + x.minutes, 0));
+    document.getElementById('qsGainH').textContent = formatM(h.reduce((s, x) => s + x.gain, 0));
 }
 
 function renderDepenses() {
-    const m = document.getElementById('filtreDepenseMois').value;
-    const depenses = getDepensesForMonth(m);
-    const c = document.getElementById('listeDepenses');
-    if (!depenses.length) { c.innerHTML = '<p class="empty-state">🎉 Aucune dépense ce mois !</p>'; return; }
-    c.innerHTML = depenses.map(d => `<div class="list-item"><div class="list-item-icon">${d.categorie.split(' ')[0]}</div><div class="list-item-body"><div class="list-item-title">${d.description || d.categorie}</div><div class="list-item-sub">${d.categorie} · ${formatDate(d.date)}</div></div><div class="list-item-right"><span class="list-item-amount amount-red">-${formatM(d.montant)}</span><button class="delete-btn" onclick="deleteDepense(${d.id})">🗑️</button></div></div>`).join('');
+    const m = document.getElementById('filtreDepenseMois').value, d = getD(m), c = document.getElementById('listeDepenses');
+    if (!d.length) { c.innerHTML = '<p class="empty-state">🎉 Aucune dépense !</p>'; return; }
+    c.innerHTML = d.map(x => `<div class="list-item"><div class="list-item-icon">${x.categorie.split(' ')[0]}</div><div class="list-item-body"><div class="list-item-title">${x.description||x.categorie}</div><div class="list-item-sub">${x.categorie} · ${formatDate(x.date)}</div></div><div class="list-item-right"><span class="list-item-amount amount-red">-${formatM(x.montant)}</span><button class="delete-btn" onclick="deleteDepense(${x.id})">🗑️</button></div></div>`).join('');
 }
 
 function renderQuickStatsD() {
-    const m = document.getElementById('filtreDepenseMois').value;
-    const depenses = getDepensesForMonth(m);
-    const total = depenses.reduce((s, d) => s + d.montant, 0);
-    document.getElementById('qsNbD').textContent = depenses.length;
-    document.getElementById('qsMoyD').textContent = formatM(depenses.length ? total / depenses.length : 0);
-    document.getElementById('qsMaxD').textContent = formatM(depenses.length ? Math.max(...depenses.map(d => d.montant)) : 0);
+    const m = document.getElementById('filtreDepenseMois').value, d = getD(m);
+    const t = d.reduce((s, x) => s + x.montant, 0);
+    document.getElementById('qsNbD').textContent = d.length;
+    document.getElementById('qsMoyD').textContent = formatM(d.length ? t/d.length : 0);
+    document.getElementById('qsMaxD').textContent = formatM(d.length ? Math.max(...d.map(x => x.montant)) : 0);
 }
 
 function renderCatSummary() {
-    const m = document.getElementById('filtreDepenseMois').value;
-    const depenses = getDepensesForMonth(m);
-    const c = document.getElementById('catSummary');
-    if (!depenses.length) { c.innerHTML = ''; return; }
+    const m = document.getElementById('filtreDepenseMois').value, d = getD(m), c = document.getElementById('catSummary');
+    if (!d.length) { c.innerHTML = ''; return; }
     const cats = {};
-    depenses.forEach(d => { cats[d.categorie] = (cats[d.categorie] || 0) + d.montant; });
-    const sorted = Object.entries(cats).sort((a, b) => b[1] - a[1]);
+    d.forEach(x => { cats[x.categorie] = (cats[x.categorie]||0)+x.montant; });
+    const sorted = Object.entries(cats).sort((a,b) => b[1]-a[1]);
     const max = sorted[0][1];
-    c.innerHTML = sorted.map(([cat, amt], i) => `<div class="cat-row"><span class="cat-name">${cat}</span><div class="cat-track"><div class="cat-fill" style="width:${(amt/max)*100}%;background:${CAT_COLORS[i%CAT_COLORS.length]};"></div></div><span class="cat-amount">${formatM(amt)}</span></div>`).join('');
+    c.innerHTML = sorted.map(([cat,amt],i) => `<div class="cat-row"><span class="cat-name">${cat}</span><div class="cat-track"><div class="cat-fill" style="width:${(amt/max)*100}%;background:${CAT_COLORS[i%CAT_COLORS.length]}"></div></div><span class="cat-amount">${formatM(amt)}</span></div>`).join('');
 }
 
 function renderResume() {
     const m = document.getElementById('filtreResumeMois').value;
     if (!m) return;
-    const horaires = getHorairesForMonth(m);
-    const depenses = getDepensesForMonth(m);
-    const revenus = horaires.reduce((s, h) => s + h.gain, 0);
-    const totalDep = depenses.reduce((s, d) => s + d.montant, 0);
-    const solde = revenus - totalDep;
-    const jours = new Set(horaires.map(h => h.date)).size;
-    const mins = horaires.reduce((s, h) => s + h.minutes, 0);
-    const moy = depenses.length ? totalDep / depenses.length : 0;
+    const h = getH(m), d = getD(m);
+    const rev = h.reduce((s,x) => s+x.gain,0), dep = d.reduce((s,x) => s+x.montant,0), sol = rev-dep;
+    const jrs = new Set(h.map(x => x.date)).size, mins = h.reduce((s,x) => s+x.minutes,0);
 
-    document.getElementById('bilanRevenus').textContent = formatM(revenus);
-    document.getElementById('bilanDepenses').textContent = formatM(totalDep);
-    const total = revenus + totalDep;
-    document.getElementById('progressGreen').style.width = (total > 0 ? (revenus/total)*100 : 50) + '%';
-    document.getElementById('progressRed').style.width = (total > 0 ? (totalDep/total)*100 : 50) + '%';
+    document.getElementById('bilanRevenus').textContent = formatM(rev);
+    document.getElementById('bilanDepenses').textContent = formatM(dep);
+    const tot = rev+dep;
+    document.getElementById('progressGreen').style.width = (tot>0?(rev/tot)*100:50)+'%';
+    document.getElementById('progressRed').style.width = (tot>0?(dep/tot)*100:50)+'%';
     const se = document.getElementById('bilanSolde');
-    se.textContent = (solde >= 0 ? '' : '-') + formatM(Math.abs(solde));
-    se.className = solde >= 0 ? 'positive' : 'negative';
-    const pct = revenus > 0 ? Math.round((totalDep/revenus)*100) : 0;
-    document.getElementById('bilanPercent').textContent = revenus > 0 ? `Vous avez dépensé ${pct}% de vos revenus` : 'Aucun revenu ce mois';
-    document.getElementById('statJours').textContent = jours;
+    se.textContent = (sol>=0?'':'-')+formatM(Math.abs(sol));
+    se.className = sol>=0?'positive':'negative';
+    document.getElementById('bilanPercent').textContent = rev>0?`${Math.round((dep/rev)*100)}% dépensé`:'Aucun revenu';
+    document.getElementById('statJours').textContent = jrs;
     document.getElementById('statHeures').textContent = formatDuree(mins);
-    document.getElementById('statNbDep').textContent = depenses.length;
-    document.getElementById('statMoyDep').textContent = formatM(moy);
-    renderBarChart(m, depenses);
-    renderTopDepenses(depenses);
-}
+    document.getElementById('statNbDep').textContent = d.length;
+    document.getElementById('statMoyDep').textContent = formatM(d.length?dep/d.length:0);
 
-function renderBarChart(mois, depenses) {
-    const c = document.getElementById('barChart');
-    const [y, mo] = mois.split('-').map(Number);
-    const days = new Date(y, mo, 0).getDate();
+    // Chart
+    const ct = document.getElementById('barChart');
+    const [y,mo] = m.split('-').map(Number);
+    const days = new Date(y,mo,0).getDate();
     const daily = {};
-    depenses.forEach(d => { const day = parseInt(d.date.split('-')[2]); daily[day] = (daily[day]||0)+d.montant; });
-    const maxVal = Object.values(daily).length ? Math.max(...Object.values(daily)) : 1;
+    d.forEach(x => { const day = parseInt(x.date.split('-')[2]); daily[day]=(daily[day]||0)+x.montant; });
+    const mx = Object.values(daily).length?Math.max(...Object.values(daily)):1;
     let html = '';
-    for (let day = 1; day <= days; day++) {
-        const val = daily[day]||0;
-        const h = val > 0 ? Math.max((val/maxVal)*80, 4) : 0;
-        html += `<div class="bar-col"><div class="bar-fill" style="height:${h}px;" title="${day}/${mo}: ${formatM(val)}"></div><span class="bar-label">${day}</span></div>`;
-    }
-    c.innerHTML = html || '<p style="color:var(--text2);font-size:0.85rem;text-align:center;width:100%">Aucune dépense</p>';
-}
+    for (let i=1;i<=days;i++){const v=daily[i]||0;const ht=v>0?Math.max((v/mx)*80,4):0;html+=`<div class="bar-col"><div class="bar-fill" style="height:${ht}px" title="${i}/${mo}: ${formatM(v)}"></div><span class="bar-label">${i}</span></div>`;}
+    ct.innerHTML = html||'<p style="color:var(--text2);text-align:center;width:100%">Aucune dépense</p>';
 
-function renderTopDepenses(depenses) {
-    const c = document.getElementById('topDepenses');
-    if (!depenses.length) { c.innerHTML = '<p style="color:var(--text2);font-size:0.85rem;text-align:center;padding:12px">Aucune dépense</p>'; return; }
-    c.innerHTML = [...depenses].sort((a,b)=>b.montant-a.montant).slice(0,5).map(d => `<div class="top-dep-item"><span>${d.categorie} ${d.description?'· '+d.description:''}</span><strong>-${formatM(d.montant)}</strong></div>`).join('');
+    // Top
+    const tp = document.getElementById('topDepenses');
+    if (!d.length) { tp.innerHTML = '<p style="color:var(--text2);text-align:center;padding:12px">Aucune</p>'; return; }
+    tp.innerHTML = [...d].sort((a,b)=>b.montant-a.montant).slice(0,5).map(x => `<div class="top-dep-item"><span>${x.categorie}${x.description?' · '+x.description:''}</span><strong>-${formatM(x.montant)}</strong></div>`).join('');
 }
 
 // ===== SETTINGS =====
 function initSettings() {
     document.getElementById('tauxPlus').addEventListener('click', () => { const i = document.getElementById('tauxHoraire'); i.value = (parseFloat(i.value)+0.5).toFixed(2); });
     document.getElementById('tauxMinus').addEventListener('click', () => { const i = document.getElementById('tauxHoraire'); const v = parseFloat(i.value)-0.5; if(v>=0)i.value=v.toFixed(2); });
-
-    document.querySelectorAll('.devise-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.devise-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-        });
-    });
+    document.querySelectorAll('.devise-btn').forEach(btn => { btn.addEventListener('click', () => { document.querySelectorAll('.devise-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); }); });
 
     document.getElementById('btnSaveSettings').addEventListener('click', () => {
         App.settings.tauxHoraire = parseFloat(document.getElementById('tauxHoraire').value) || 0;
         App.settings.devise = document.querySelector('.devise-btn.active')?.dataset.devise || '€';
         App.horaires.forEach(h => { h.gain = (h.minutes/60)*App.settings.tauxHoraire; });
-        saveData(); renderAll(); showToast('⚙️ Réglages sauvegardés !');
+        saveData(); cloudSaveSettings();
+        // Re-upload horaires with new gains
+        if (currentUser && !isGuestMode) {
+            App.horaires.forEach(h => cloudAddHoraire(h));
+        }
+        renderAll(); showToast('⚙️ Sauvegardé !');
     });
 
     document.getElementById('btnExport').addEventListener('click', () => {
-        const data = { horaires: App.horaires, depenses: App.depenses, settings: App.settings, exportDate: new Date().toISOString() };
-        const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
-        const url = URL.createObjectURL(blob);
+        const blob = new Blob([JSON.stringify({ horaires: App.horaires, depenses: App.depenses, settings: App.settings, exportDate: new Date().toISOString() }, null, 2)], { type: 'application/json' });
         const a = document.createElement('a');
-        a.href = url; a.download = `monbudget_${todayStr()}.json`; a.click();
-        URL.revokeObjectURL(url);
-        showToast('📤 Données exportées !');
+        a.href = URL.createObjectURL(blob); a.download = `monbudget_${todayStr()}.json`; a.click();
+        showToast('📤 Exporté !');
     });
 
     document.getElementById('btnImport').addEventListener('change', e => {
@@ -765,10 +758,16 @@ function initSettings() {
         reader.onload = ev => {
             try {
                 const data = JSON.parse(ev.target.result);
-                if(data.horaires) App.horaires = data.horaires;
-                if(data.depenses) App.depenses = data.depenses;
-                if(data.settings) App.settings = {...App.settings,...data.settings};
-                saveData(); setDefaultDates(); renderAll(); showToast('📥 Données importées !');
+                if (data.horaires) App.horaires = data.horaires;
+                if (data.depenses) App.depenses = data.depenses;
+                if (data.settings) App.settings = { ...App.settings, ...data.settings };
+                saveData(); setDefaultDates(); renderAll();
+                // Upload to cloud
+                if (currentUser && !isGuestMode) {
+                    localStorage.removeItem('mb_uploaded_' + currentUser.uid);
+                    uploadLocalDataIfNeeded(currentUser.uid);
+                }
+                showToast('📥 Importé !');
             } catch { showToast('❌ Fichier invalide'); }
         };
         reader.readAsText(file);
@@ -776,55 +775,35 @@ function initSettings() {
     });
 
     document.getElementById('btnReset').addEventListener('click', () => {
-        showConfirm('⚠️ Tout supprimer ?', 'Toutes vos données seront effacées.', () => {
+        showConfirm('⚠️ Tout supprimer ?', 'Données locales ET cloud effacées.', async () => {
             App.horaires = []; App.depenses = [];
-            saveData(); renderAll(); showToast('🗑️ Données supprimées');
+            saveData(); await cloudDeleteAll(); renderAll(); showToast('🗑️ Tout supprimé');
         });
     });
 }
 
-// ===== MODALS =====
-function showConfirm(title, message, onConfirm) {
+// ===== MODAL =====
+function showConfirm(title, msg, onConfirm) {
     document.getElementById('modalTitle').textContent = title;
-    document.getElementById('modalMessage').textContent = message;
-    const overlay = document.getElementById('modalOverlay');
-    overlay.classList.add('show');
-    const close = () => overlay.classList.remove('show');
+    document.getElementById('modalMessage').textContent = msg;
+    const o = document.getElementById('modalOverlay');
+    o.classList.add('show');
+    const close = () => o.classList.remove('show');
     document.getElementById('modalConfirm').onclick = () => { close(); onConfirm(); };
     document.getElementById('modalCancel').onclick = close;
-    overlay.onclick = e => { if(e.target === overlay) close(); };
-}
-
-// ===== INSTALL BANNER =====
-function showInstallBanner() {
-    const isIOS = /iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase());
-    const isStandalone = window.navigator.standalone === true;
-    const dismissed = localStorage.getItem('mb_banner_dismissed');
-    if(isIOS && !isStandalone && !dismissed) document.getElementById('installBanner').classList.add('show');
-    document.getElementById('installClose').addEventListener('click', () => {
-        document.getElementById('installBanner').classList.remove('show');
-        localStorage.setItem('mb_banner_dismissed', '1');
-    });
+    o.onclick = e => { if(e.target===o) close(); };
 }
 
 // ===== TOAST =====
 function showToast(msg) {
     const t = document.getElementById('toast');
-    t.textContent = msg;
-    t.className = 'toast show';
+    t.textContent = msg; t.className = 'toast show';
     clearTimeout(t._timer);
     t._timer = setTimeout(() => { t.className = 'toast'; }, 2800);
 }
 
 // ===== UTILS =====
-function calcMinutes(debut, fin, pause = 0) {
-    const [dh,dm] = debut.split(':').map(Number);
-    const [fh,fm] = fin.split(':').map(Number);
-    let t = (fh*60+fm) - (dh*60+dm);
-    if(t<0) t += 1440;
-    return Math.max(0, t - pause);
-}
-
+function calcMinutes(d, f, p=0) { const [dh,dm]=d.split(':').map(Number); const [fh,fm]=f.split(':').map(Number); let t=(fh*60+fm)-(dh*60+dm); if(t<0)t+=1440; return Math.max(0,t-p); }
 function formatDuree(m) { return `${Math.floor(m/60)}h ${String(m%60).padStart(2,'0')}`; }
-function formatM(a) { return a.toFixed(2).replace('.',',') + ' ' + App.settings.devise; }
-function formatDate(d) { const [y,m,j] = d.split('-'); return `${j}/${m}/${y}`; }
+function formatM(a) { return a.toFixed(2).replace('.',',')+' '+App.settings.devise; }
+function formatDate(d) { const [y,m,j]=d.split('-'); return `${j}/${m}/${y}`; }
