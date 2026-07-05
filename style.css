@@ -1336,3 +1336,25 @@ body {
 .prio-tag.normal { background: var(--purple-glow); color: var(--primary-light); }
 .prio-tag.envie { background: rgba(255,209,102,0.15); color: var(--yellow); }
 
+/* ===== REPORT SOLDE ===== */
+.report-section {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+}
+
+.report-section:empty { display: none; }
+
+.report-hint {
+    text-align: center;
+    font-size: 0.78rem;
+    color: var(--text2);
+    margin-top: 10px;
+    font-style: italic;
+}
+
+.report-hint.done {
+    color: var(--green);
+    font-weight: 600;
+    font-style: normal;
+}
