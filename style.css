@@ -1052,12 +1052,15 @@ body {
 ::selection { background: var(--primary-glow); }
 
 /* ===== AJUSTEMENT PAIE ===== */
+/* ===== AJUSTEMENT PAIE ===== */
 .paie-ajustement {
     background: var(--bg3);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     padding: 14px;
     margin-bottom: 12px;
+    overflow: hidden;
+    box-sizing: border-box;
 }
 
 .ajustement-label {
@@ -1070,11 +1073,29 @@ body {
     margin-bottom: 10px;
 }
 
+.paie-ajustement .input-stepper {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.paie-ajustement .input-stepper input {
+    min-width: 0;
+    width: 100%;
+    font-size: 1.1rem;
+}
+
+.paie-ajustement .stepper-btn {
+    width: 42px;
+    height: 42px;
+    flex-shrink: 0;
+    font-size: 1.3rem;
+}
+
 .ajustement-hint {
     text-align: center;
     font-size: 0.75rem;
     color: var(--text3);
-    margin-top: 8px;
+    margin-top: 10px;
     font-style: italic;
     min-height: 18px;
 }
@@ -1092,26 +1113,28 @@ body {
 }
 
 .quick-adjust {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
     gap: 6px;
     margin-top: 10px;
-    flex-wrap: wrap;
 }
 
 .quick-adjust-btn {
-    flex: 1;
-    min-width: 60px;
-    padding: 8px 4px;
+    padding: 8px 2px;
     border: 1.5px solid var(--border);
     border-radius: 8px;
     background: var(--card);
     color: var(--text2);
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     font-weight: 600;
     cursor: pointer;
     font-family: inherit;
     transition: all 0.15s;
     -webkit-tap-highlight-color: transparent;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .quick-adjust-btn:active {
@@ -1123,4 +1146,5 @@ body {
 .quick-adjust-btn[data-adj="reset"] {
     color: var(--primary-light);
     border-color: var(--primary);
+    font-size: 0.9rem;
 }
