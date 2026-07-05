@@ -242,17 +242,37 @@
                         <div><strong>Salaire décalé</strong><small>Les heures faites ce mois seront payées le mois suivant</small></div>
                     </div>
                     <div class="prevision-card">
-                        <div class="prevision-header">
-                            <span class="prevision-icon">🔮</span>
-                            <div><strong>Prévision de paie</strong><small>Basé sur vos heures</small></div>
-                        </div>
-                        <div class="prevision-row">
-                            <div class="prevision-item"><span>Ce mois-ci</span><strong id="previsionActuel">0,00 €</strong><small id="previsionActuelSub">Sera reçu le mois prochain</small></div>
-                            <div class="prevision-sep"></div>
-                            <div class="prevision-item"><span>Mois précédent</span><strong id="previsionPrecedent">0,00 €</strong><small id="previsionPrecedentSub">À recevoir ce mois</small></div>
-                        </div>
-                        <button class="submit-btn purple" id="btnQuickPaie">✨ Enregistrer la paie prévue</button>
-                    </div>
+    <div class="prevision-header">
+        <span class="prevision-icon">🔮</span>
+        <div><strong>Prévision de paie</strong><small>Basé sur vos heures</small></div>
+    </div>
+    <div class="prevision-row">
+        <div class="prevision-item"><span>Ce mois-ci</span><strong id="previsionActuel">0,00 €</strong><small id="previsionActuelSub">Sera reçu le mois prochain</small></div>
+        <div class="prevision-sep"></div>
+        <div class="prevision-item"><span>Mois précédent</span><strong id="previsionPrecedent">0,00 €</strong><small id="previsionPrecedentSub">À recevoir ce mois</small></div>
+    </div>
+
+    <div class="paie-ajustement" id="paieAjustement">
+        <label class="ajustement-label">💶 Montant réel à enregistrer</label>
+        <div class="input-stepper">
+            <button type="button" class="stepper-btn" id="paieMinus">−</button>
+            <input type="number" id="montantPaieAjuste" step="0.01" min="0" value="0" inputmode="decimal">
+            <button type="button" class="stepper-btn" id="paiePlus">+</button>
+        </div>
+        <div class="ajustement-hint">
+            <span id="diffHint">Ajustez selon votre bulletin de paie</span>
+        </div>
+        <div class="quick-adjust">
+            <button type="button" class="quick-adjust-btn" data-adj="reset">🔄 Original</button>
+            <button type="button" class="quick-adjust-btn" data-adj="-5">-5%</button>
+            <button type="button" class="quick-adjust-btn" data-adj="-10">-10%</button>
+            <button type="button" class="quick-adjust-btn" data-adj="-15">-15%</button>
+            <button type="button" class="quick-adjust-btn" data-adj="-20">-20%</button>
+        </div>
+    </div>
+
+    <button class="submit-btn purple" id="btnQuickPaie">✨ Enregistrer cette paie</button>
+</div>
                     <div class="form-card collapsed" id="formCardP">
                         <form id="formPaiement">
                             <div class="form-field"><label>📅 Mois de réception</label><input type="month" id="moisPaiement" required></div>
