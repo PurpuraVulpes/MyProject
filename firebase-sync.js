@@ -17,6 +17,7 @@ const firebaseConfig = {
 
 
 
+
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
@@ -58,7 +59,7 @@ async function logout() {
     if (unsubHoraires) { unsubHoraires(); unsubHoraires = null; }
     if (unsubDepenses) { unsubDepenses(); unsubDepenses = null; }
     if (unsubPaiements) { unsubPaiements(); unsubPaiements = null; }
-        if (unsubExtras) { unsubExtras(); unsubExtras = null; }
+    if (unsubExtras) { unsubExtras(); unsubExtras = null; }
     if (unsubEpargne) { unsubEpargne(); unsubEpargne = null; }
     if (unsubShopping) { unsubShopping(); unsubShopping = null; }
     if (unsubSettings) { unsubSettings(); unsubSettings = null; }
@@ -150,6 +151,22 @@ async function uploadLocalDataIfNeeded(uid) {
                 });
                 await batch4.commit();
             }
+            if (App.epargne && App.epargne.length > 0) {
+                var batch5 = db.batch();
+                App.epargne.forEach(function(e) {
+                    var docRef = ref.collection('epargne').doc(String(e.id));
+                    batch5.set(docRef, Object.assign({}, e, { updatedAt: firebase.firestore.FieldValue.serverTimestamp() }));
+                });
+                await batch5.commit();
+            }
+            if (App.shopping && App.shopping.length > 0) {
+                var batch6 = db.batch();
+                App.shopping.forEach(function(s) {
+                    var docRef = ref.collection('shopping').doc(String(s.id));
+                    batch6.set(docRef, Object.assign({}, s, { updatedAt: firebase.firestore.FieldValue.serverTimestamp() }));
+                });
+                await batch6.commit();
+            }
             showToast('☁️ Données synchronisées !');
         }
         localStorage.setItem('mb_uploaded_' + uid, '1');
@@ -207,23 +224,30 @@ function startRealtimeSync(uid) {
         if (typeof renderAll === 'function') renderAll();
     }, function(err) { console.error('Extras:', err); });
 
-        unsubEpargne = ref.collection('epargne').onSnapshot(function(snapshot) {
+    unsubEpargne = ref.collection('epargne').onSnapshot(function(snapshot) {
         App.epargne = [];
-        snapshot.forEach(function(doc) { var data = doc.data(); delete data.updatedAt; App.epargne.push(data); });
+        snapshot.forEach(function(doc) {
+            var data = doc.data();
+            delete data.updatedAt;
+            App.epargne.push(data);
+        });
         App.epargne.sort(function(a, b) { return b.date.localeCompare(a.date); });
         saveLocalData();
         if (typeof renderEpargne === 'function') renderEpargne();
+        if (typeof renderDashboard === 'function') renderDashboard();
     }, function(err) { console.error('Epargne:', err); });
 
     unsubShopping = ref.collection('shopping').onSnapshot(function(snapshot) {
         App.shopping = [];
-        snapshot.forEach(function(doc) { var data = doc.data(); delete data.updatedAt; App.shopping.push(data); });
+        snapshot.forEach(function(doc) {
+            var data = doc.data();
+            delete data.updatedAt;
+            App.shopping.push(data);
+        });
         saveLocalData();
         if (typeof renderShopping === 'function') renderShopping();
     }, function(err) { console.error('Shopping:', err); });
 
-    unsubSettings = ref.collection('data').doc('settings').onSnapshot(function(doc) {
-        
     unsubSettings = ref.collection('data').doc('settings').onSnapshot(function(doc) {
         if (doc.exists) {
             var data = doc.data();
@@ -296,9 +320,10 @@ async function cloudDeleteExtra(id) {
     catch (e) { console.error('Cloud delete extra:', e); }
 }
 
-    async function cloudAddEpargne(e) {
+async function cloudAddEpargne(e) {
     if (!currentUser || isGuestMode) return;
-    try { var ref = db.collection('users').doc(currentUser.uid).collection('epargne').doc(String(e.id));
+    try {
+        var ref = db.collection('users').doc(currentUser.uid).collection('epargne').doc(String(e.id));
         await ref.set(Object.assign({}, e, { updatedAt: firebase.firestore.FieldValue.serverTimestamp() }));
     } catch (er) { console.error('Cloud add epargne:', er); }
 }
@@ -311,7 +336,8 @@ async function cloudDeleteEpargne(id) {
 
 async function cloudAddShopItem(s) {
     if (!currentUser || isGuestMode) return;
-    try { var ref = db.collection('users').doc(currentUser.uid).collection('shopping').doc(String(s.id));
+    try {
+        var ref = db.collection('users').doc(currentUser.uid).collection('shopping').doc(String(s.id));
         await ref.set(Object.assign({}, s, { updatedAt: firebase.firestore.FieldValue.serverTimestamp() }));
     } catch (e) { console.error('Cloud add shop:', e); }
 }
@@ -355,7 +381,7 @@ async function cloudDeleteAll() {
         var extras = await ref.collection('extras').get();
         var batch4 = db.batch();
         extras.forEach(function(doc) { batch4.delete(doc.ref); });
-                await batch4.commit();
+        await batch4.commit();
         var epargne = await ref.collection('epargne').get();
         var batch5 = db.batch();
         epargne.forEach(function(doc) { batch5.delete(doc.ref); });
