@@ -6,6 +6,8 @@ const App = {
     depenses: [],
     paiements: [],
     extras: [],
+    epargne: [],
+    shopping: [],
     settings: { tauxHoraire: 12.00, devise: '€', arrondi: 'none', theme: 'purple' },
     activeTab: 'horaires'
 };
@@ -124,11 +126,15 @@ function loadData() {
         var d = localStorage.getItem('mb_depenses');
         var p = localStorage.getItem('mb_paiements');
         var e = localStorage.getItem('mb_extras');
+        var ep = localStorage.getItem('mb_epargne');
+        var sh = localStorage.getItem('mb_shopping');
         var s = localStorage.getItem('mb_settings');
         if (h) App.horaires = JSON.parse(h);
         if (d) App.depenses = JSON.parse(d);
         if (p) App.paiements = JSON.parse(p);
         if (e) App.extras = JSON.parse(e);
+        if (ep) App.epargne = JSON.parse(ep);
+        if (sh) App.shopping = JSON.parse(sh);
         if (s) App.settings = Object.assign({}, App.settings, JSON.parse(s));
     } catch (er) { console.error(er); }
 }
@@ -138,6 +144,8 @@ function saveData() {
     localStorage.setItem('mb_depenses', JSON.stringify(App.depenses));
     localStorage.setItem('mb_paiements', JSON.stringify(App.paiements));
     localStorage.setItem('mb_extras', JSON.stringify(App.extras));
+    localStorage.setItem('mb_epargne', JSON.stringify(App.epargne));
+    localStorage.setItem('mb_shopping', JSON.stringify(App.shopping));
     localStorage.setItem('mb_settings', JSON.stringify(App.settings));
 }
 
@@ -695,6 +703,197 @@ function deleteExtra(id) {
     });
 }
 
+// ===== EPARGNE =====
+var epargneMode = 'deposit';
+
+function getEpargneForMonth(m) {
+    return App.epargne.filter(function(e) { return e.date.startsWith(m); });
+}
+
+function getEpargneSolde() {
+    return App.epargne.reduce(function(s, e) {
+        return s + (e.type === 'deposit' ? e.montant : -e.montant);
+    }, 0);
+}
+
+function openEpargneForm(mode) {
+    epargneMode = mode;
+    var label = document.getElementById('epargneFormLabel');
+    var btn = document.getElementById('btnSubmitEpargne');
+    var card = document.getElementById('formCardEpargne');
+    if (mode === 'deposit') {
+        label.textContent = '💶 Montant à épargner (€)';
+        btn.textContent = '📥 Épargner';
+        btn.className = 'submit-btn green';
+    } else {
+        label.textContent = '💶 Montant à retirer (€)';
+        btn.textContent = '📤 Retirer';
+        btn.className = 'submit-btn purple';
+    }
+    card.classList.remove('collapsed');
+    setTimeout(function() { card.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }, 100);
+}
+
+function addEpargne() {
+    var montant = parseFloat(document.getElementById('montantEpargne').value);
+    var raison = document.getElementById('raisonEpargne').value.trim();
+    if (!montant || montant <= 0) { showToast('⚠️ Montant invalide'); return; }
+    if (epargneMode === 'withdraw' && montant > getEpargneSolde()) {
+        showToast('⚠️ Solde insuffisant'); return;
+    }
+    var entry = {
+        id: Date.now(),
+        date: todayStr(),
+        montant: montant,
+        type: epargneMode,
+        raison: raison
+    };
+    App.epargne.push(entry);
+    App.epargne.sort(function(a, b) { return b.date.localeCompare(a.date); });
+    saveData();
+    if (typeof cloudAddEpargne === 'function') cloudAddEpargne(entry);
+    renderEpargne();
+    renderDashboard();
+    var msg = epargneMode === 'deposit' ? '📥 ' + formatM(montant) + ' épargné !' : '📤 ' + formatM(montant) + ' retiré !';
+    showToast(msg);
+    document.getElementById('montantEpargne').value = '';
+    document.getElementById('raisonEpargne').value = '';
+    document.getElementById('formCardEpargne').classList.add('collapsed');
+}
+
+function deleteEpargne(id) {
+    showConfirm('Supprimer ?', 'Supprimer ce mouvement ?', function() {
+        App.epargne = App.epargne.filter(function(e) { return e.id !== id; });
+        saveData();
+        if (typeof cloudDeleteEpargne === 'function') cloudDeleteEpargne(id);
+        renderEpargne();
+        renderDashboard();
+        showToast('🗑️ Supprimé');
+    });
+}
+
+function renderEpargne() {
+    var solde = getEpargneSolde();
+    document.getElementById('epargneSolde').textContent = formatM(solde);
+    var m = document.getElementById('filtreEpargneMois');
+    if (!m) return;
+    var mStr = m.value;
+    var entries = getEpargneForMonth(mStr);
+    var depots = entries.filter(function(e) { return e.type === 'deposit'; });
+    var retraits = entries.filter(function(e) { return e.type === 'withdraw'; });
+    var totalDepots = depots.reduce(function(s, e) { return s + e.montant; }, 0);
+    var totalRetraits = retraits.reduce(function(s, e) { return s + e.montant; }, 0);
+    document.getElementById('qsNbEpargne').textContent = entries.length;
+    document.getElementById('qsDepotEpargne').textContent = formatM(totalDepots);
+    document.getElementById('qsRetraitEpargne').textContent = formatM(totalRetraits);
+    var c = document.getElementById('listeEpargne');
+    if (!entries.length) { c.innerHTML = '<p class="empty-state">🏦 Aucun mouvement ce mois.</p>'; return; }
+    c.innerHTML = entries.map(function(e) {
+        var icon = e.type === 'deposit' ? '📥' : '📤';
+        var cls = e.type === 'deposit' ? 'amount-green' : 'amount-red';
+        var sign = e.type === 'deposit' ? '+' : '-';
+        return '<div class="list-item"><div class="list-item-icon">' + icon + '</div>' +
+            '<div class="list-item-body"><div class="list-item-title">' + (e.raison || (e.type === 'deposit' ? 'Dépôt' : 'Retrait')) + '</div>' +
+            '<div class="list-item-sub">' + formatDate(e.date) + '</div></div>' +
+            '<div class="list-item-right"><span class="list-item-amount ' + cls + '">' + sign + formatM(e.montant) + '</span>' +
+            '<button class="delete-btn" onclick="deleteEpargne(' + e.id + ')">🗑️</button></div></div>';
+    }).join('');
+}
+
+// ===== SHOPPING LIST =====
+function selectPrio(el, val) {
+    document.querySelectorAll('.prio-btn').forEach(function(b) { b.classList.remove('active'); });
+    el.classList.add('active');
+}
+
+function addShopItem() {
+    var nom = document.getElementById('nomShop').value.trim();
+    var prix = parseFloat(document.getElementById('prixShop').value) || 0;
+    var note = document.getElementById('noteShop').value.trim();
+    var prioBtn = document.querySelector('.prio-btn.active');
+    var prio = prioBtn ? prioBtn.dataset.prio : 'normal';
+    if (!nom) { showToast('⚠️ Entrez un article'); return; }
+    var item = {
+        id: Date.now(),
+        nom: nom,
+        prix: prix,
+        prio: prio,
+        note: note,
+        bought: false,
+        date: todayStr()
+    };
+    App.shopping.push(item);
+    saveData();
+    if (typeof cloudAddShopItem === 'function') cloudAddShopItem(item);
+    renderShopping();
+    showToast('✅ ' + nom + ' ajouté !');
+    document.getElementById('nomShop').value = '';
+    document.getElementById('prixShop').value = '';
+    document.getElementById('noteShop').value = '';
+    toggleForm('formCardShop', 'btnToggleFormShop');
+}
+
+function toggleShopBought(id) {
+    var item = App.shopping.find(function(s) { return s.id === id; });
+    if (item) {
+        item.bought = !item.bought;
+        saveData();
+        if (typeof cloudAddShopItem === 'function') cloudAddShopItem(item);
+        renderShopping();
+    }
+}
+
+function deleteShopItem(id) {
+    showConfirm('Supprimer ?', 'Supprimer cet article ?', function() {
+        App.shopping = App.shopping.filter(function(s) { return s.id !== id; });
+        saveData();
+        if (typeof cloudDeleteShopItem === 'function') cloudDeleteShopItem(id);
+        renderShopping();
+        showToast('🗑️ Supprimé');
+    });
+}
+
+function renderShopping() {
+    var summary = document.getElementById('shopSummary');
+    var c = document.getElementById('listeShop');
+    var remaining = App.shopping.filter(function(s) { return !s.bought; });
+    var bought = App.shopping.filter(function(s) { return s.bought; });
+    var totalRemaining = remaining.reduce(function(s, i) { return s + i.prix; }, 0);
+    if (App.shopping.length > 0) {
+        summary.innerHTML = '<div><span class="shop-total-label">🛒 ' + remaining.length + ' article(s) restant(s)</span></div><span class="shop-total-amount">' + formatM(totalRemaining) + '</span>';
+    } else { summary.innerHTML = ''; }
+    if (!App.shopping.length) { c.innerHTML = '<p class="empty-state">🛒 Liste vide.</p>'; return; }
+    var prioOrder = { urgent: 0, normal: 1, envie: 2 };
+    var sorted = remaining.sort(function(a, b) { return (prioOrder[a.prio] || 1) - (prioOrder[b.prio] || 1); });
+    var allItems = sorted.concat(bought);
+    c.innerHTML = allItems.map(function(s) {
+        var boughtClass = s.bought ? ' bought' : '';
+        var checkClass = s.bought ? ' checked' : '';
+        var checkIcon = s.bought ? '✓' : '';
+        var prioTag = '';
+        if (s.prio === 'urgent') prioTag = '<span class="prio-tag urgent">🔴 Urgent</span>';
+        else if (s.prio === 'envie') prioTag = '<span class="prio-tag envie">💫 Envie</span>';
+        else prioTag = '<span class="prio-tag normal">📦 Normal</span>';
+        return '<div class="shop-item' + boughtClass + '">' +
+            '<button class="shop-checkbox' + checkClass + '" onclick="toggleShopBought(' + s.id + ')">' + checkIcon + '</button>' +
+            '<div class="shop-item-body"><div class="shop-item-name">' + s.nom + '</div>' +
+            (s.note ? '<div class="shop-item-note">' + s.note + '</div>' : '') + '</div>' +
+            '<div class="shop-item-right">' + (s.prix > 0 ? '<span class="shop-item-price">' + formatM(s.prix) + '</span>' : '') +
+            prioTag +
+            '<button class="delete-btn" onclick="deleteShopItem(' + s.id + ')">🗑️</button></div></div>';
+    }).join('');
+}
+
+function switchBudgetTab(sub) {
+    document.querySelectorAll('#tab-depenses .sub-tab').forEach(function(t) {
+        t.classList.toggle('active', t.dataset.subtab === sub);
+    });
+    document.querySelectorAll('#tab-depenses .sub-tab-content').forEach(function(c) {
+        c.classList.toggle('active', c.id === 'subtab-' + sub);
+    });
+    if (sub === 'shopping-list') renderShopping();
+}
+
 // ===== RENDER ALL =====
 function renderAll() {
     renderDashboard();
@@ -1028,7 +1227,9 @@ function goTab(tab) {
     document.getElementById('mainScroll').scrollTo({ top: 0, behavior: 'smooth' });
     if (tab === 'resume') renderResume();
     if (tab === 'depenses') renderCatSummary();
-    if (tab === 'paiements') { renderPaiements(); renderExtras(); }
+        if (tab === 'paiements') { renderPaiements(); renderExtras(); }
+    if (tab === 'epargne') renderEpargne();
+    if (tab === 'depenses') renderShopping();
 }
 
 function switchSubTab(sub) {
@@ -1097,8 +1298,10 @@ function setDefaultDates() {
     if (mp) mp.value = month;
     var de = document.getElementById('dateExtra');
     if (de) de.value = today;
-    var fem = document.getElementById('filtreExtraMois');
+        var fem = document.getElementById('filtreExtraMois');
     if (fem) fem.value = month;
+    var fep = document.getElementById('filtreEpargneMois');
+    if (fep) fep.value = month;
     document.getElementById('filtreHoraireMois').value = month;
     document.getElementById('filtreDepenseMois').value = month;
     document.getElementById('filtreResumeMois').value = month;
@@ -1171,9 +1374,19 @@ function initForms() {
         });
     });
 
-    var fe = document.getElementById('formExtra');
+        var fe = document.getElementById('formExtra');
     if (fe) fe.addEventListener('submit', function(e) { e.preventDefault(); addExtra(); });
-}
+
+    var fep = document.getElementById('formEpargne');
+    if (fep) fep.addEventListener('submit', function(e) { e.preventDefault(); addEpargne(); });
+
+    var dep = document.getElementById('btnEpargneDeposit');
+    if (dep) dep.addEventListener('click', function() { openEpargneForm('deposit'); });
+    var wit = document.getElementById('btnEpargneWithdraw');
+    if (wit) wit.addEventListener('click', function() { openEpargneForm('withdraw'); });
+
+    var fsh = document.getElementById('formShop');
+    if (fsh) fsh.addEventListener('submit', function(e) { e.preventDefault(); addShopItem(); });
 
 // ===== INIT TAB TOGGLES =====
 function initTabs() {
@@ -1181,8 +1394,10 @@ function initTabs() {
     document.getElementById('btnToggleFormD').addEventListener('click', function() { toggleForm('formCardD', 'btnToggleFormD'); });
     var btnP = document.getElementById('btnToggleFormP');
     if (btnP) btnP.addEventListener('click', function() { toggleForm('formCardP', 'btnToggleFormP'); });
-    var btnE = document.getElementById('btnToggleFormE');
+        var btnE = document.getElementById('btnToggleFormE');
     if (btnE) btnE.addEventListener('click', function() { toggleForm('formCardE', 'btnToggleFormE'); });
+    var btnShop = document.getElementById('btnToggleFormShop');
+    if (btnShop) btnShop.addEventListener('click', function() { toggleForm('formCardShop', 'btnToggleFormShop'); });
 }
 
 // ===== INIT MONTH FILTERS =====
@@ -1221,8 +1436,15 @@ function initMonthFilters() {
     var fem = document.getElementById('filtreExtraMois');
     if (fem) {
         fem.addEventListener('change', renderExtras);
-        document.getElementById('prevE').addEventListener('click', function() { changeMonth('filtreExtraMois', -1, renderExtras); });
+             document.getElementById('prevE').addEventListener('click', function() { changeMonth('filtreExtraMois', -1, renderExtras); });
         document.getElementById('nextE').addEventListener('click', function() { changeMonth('filtreExtraMois', 1, renderExtras); });
+    }
+
+    var fep = document.getElementById('filtreEpargneMois');
+    if (fep) {
+        fep.addEventListener('change', renderEpargne);
+        document.getElementById('prevEpargne').addEventListener('click', function() { changeMonth('filtreEpargneMois', -1, renderEpargne); });
+        document.getElementById('nextEpargne').addEventListener('click', function() { changeMonth('filtreEpargneMois', 1, renderEpargne); });
     }
 }
 
@@ -1314,11 +1536,13 @@ function initSettings() {
     });
 
     document.getElementById('btnExport').addEventListener('click', function() {
-        var data = {
+                var data = {
             horaires: App.horaires,
             depenses: App.depenses,
             paiements: App.paiements,
             extras: App.extras,
+            epargne: App.epargne,
+            shopping: App.shopping,
             settings: App.settings,
             exportDate: new Date().toISOString()
         };
@@ -1340,7 +1564,9 @@ function initSettings() {
                 if (data.horaires) App.horaires = data.horaires;
                 if (data.depenses) App.depenses = data.depenses;
                 if (data.paiements) App.paiements = data.paiements;
-                if (data.extras) App.extras = data.extras;
+                               if (data.extras) App.extras = data.extras;
+                if (data.epargne) App.epargne = data.epargne;
+                if (data.shopping) App.shopping = data.shopping;
                 if (data.settings) App.settings = Object.assign({}, App.settings, data.settings);
                 saveData();
                 setDefaultDates();
@@ -1361,7 +1587,9 @@ function initSettings() {
             App.horaires = [];
             App.depenses = [];
             App.paiements = [];
-            App.extras = [];
+                       App.extras = [];
+            App.epargne = [];
+            App.shopping = [];
             saveData();
             if (typeof cloudDeleteAll === 'function') await cloudDeleteAll();
             renderAll();
