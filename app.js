@@ -817,6 +817,59 @@ function deleteExtra(id) {
     });
 }
 
+// ===== REPORT SOLDE MOIS PRECEDENT =====
+function getReportForMonth(monthStr) {
+    // Cherche si un report existe déjà pour ce mois
+    return App.extras.find(function(e) {
+        return e.date.startsWith(monthStr) && e.source === '📅 Report' && e.isReport === true;
+    });
+}
+
+function calculateMonthReste(monthStr) {
+    // Calcule ce qui reste réellement à la fin d'un mois donné
+    var d = getD(monthStr);
+    var R = computeMonthlyRevenue(monthStr);
+    var dep = d.reduce(function(s, x) { return s + x.montant; }, 0);
+    return R.totalReel - dep;
+}
+
+function reportSoldeToNextMonth(fromMonth) {
+    var reste = calculateMonthReste(fromMonth);
+    if (reste <= 0) { showToast('⚠️ Aucun solde positif à reporter'); return; }
+
+    var nextMonth = getNextMonth(fromMonth);
+    var existing = getReportForMonth(nextMonth);
+    if (existing) {
+        showConfirm('Report déjà fait', 'Un report existe déjà pour ' + formatMonthLong(nextMonth) + '. Le remplacer ?', function() {
+            App.extras = App.extras.filter(function(e) { return e.id !== existing.id; });
+            createReport(fromMonth, nextMonth, reste);
+        });
+    } else {
+        createReport(fromMonth, nextMonth, reste);
+    }
+}
+
+function createReport(fromMonth, toMonth, montant) {
+    // Créer une entrée d'extra "Report" dans le mois suivant
+    var parts = toMonth.split('-').map(Number);
+    var dateReport = toMonth + '-01'; // 1er du mois suivant
+    var extra = {
+        id: Date.now(),
+        date: dateReport,
+        montant: montant,
+        source: '📅 Report',
+        description: 'Reste de ' + formatMonthLong(fromMonth),
+        isReport: true
+    };
+    App.extras.push(extra);
+    App.extras.sort(function(a, b) { return b.date.localeCompare(a.date); });
+    saveData();
+    if (typeof cloudAddExtra === 'function') cloudAddExtra(extra);
+    renderAll();
+    renderResume();
+    showToast('✅ ' + formatM(montant) + ' reporté à ' + formatMonthShort(toMonth) + ' !');
+}
+
 // ===== RENDER ALL =====
 function renderAll() {
     renderDashboard();
@@ -1202,11 +1255,40 @@ function renderResume() {
     }
     ct.innerHTML = htmlChart || '<p style="color:var(--text2);text-align:center;width:100%">Aucune dépense</p>';
 
-    var tp = document.getElementById('topDepenses');
-    if (!d.length) { tp.innerHTML = '<p style="color:var(--text2);text-align:center;padding:12px">Aucune</p>'; return; }
-    tp.innerHTML = d.slice().sort(function(a, b) { return b.montant - a.montant; }).slice(0, 5).map(function(x) {
-        return '<div class="top-dep-item"><span>' + x.categorie + (x.description ? ' · ' + x.description : '') + '</span><strong>-' + formatM(x.montant) + '</strong></div>';
-    }).join('');
+        var tp = document.getElementById('topDepenses');
+    if (!d.length) { tp.innerHTML = '<p style="color:var(--text2);text-align:center;padding:12px">Aucune</p>'; }
+    else {
+        tp.innerHTML = d.slice().sort(function(a, b) { return b.montant - a.montant; }).slice(0, 5).map(function(x) {
+            return '<div class="top-dep-item"><span>' + x.categorie + (x.description ? ' · ' + x.description : '') + '</span><strong>-' + formatM(x.montant) + '</strong></div>';
+        }).join('');
+    }
+
+    // Bouton report solde
+    var btnReport = document.getElementById('btnReportSolde');
+    var btnText = document.getElementById('btnReportText');
+    var reportHint = document.getElementById('reportHint');
+    if (btnReport && btnText && reportHint) {
+        var nextM = getNextMonth(m);
+        var reste = sol;
+        var existingReport = getReportForMonth(nextM);
+
+        if (existingReport) {
+            btnReport.style.display = 'block';
+            btnReport.className = 'submit-btn outline';
+            btnText.textContent = '🔄 Remplacer le report existant';
+            reportHint.textContent = '✅ ' + formatM(existingReport.montant) + ' déjà reporté à ' + formatMonthShort(nextM);
+            reportHint.className = 'report-hint done';
+        } else if (reste > 0) {
+            btnReport.style.display = 'block';
+            btnReport.className = 'submit-btn purple';
+            btnText.textContent = '📅 Reporter ' + formatM(reste) + ' à ' + formatMonthShort(nextM);
+            reportHint.textContent = 'Ajoute votre reste au mois suivant';
+            reportHint.className = 'report-hint';
+        } else {
+            btnReport.style.display = 'none';
+            reportHint.textContent = '';
+        }
+    }
 }
 
 // ===== NAVIGATION =====
@@ -1473,6 +1555,15 @@ function initThemeSelector() {
 // ===== INIT SETTINGS =====
 function initSettings() {
     initThemeSelector();
+
+    // Bouton report solde
+    var btnReport = document.getElementById('btnReportSolde');
+    if (btnReport) {
+        btnReport.addEventListener('click', function() {
+            var m = document.getElementById('filtreResumeMois').value;
+            if (m) reportSoldeToNextMonth(m);
+        });
+    }
 
     document.getElementById('tauxPlus').addEventListener('click', function() {
         var i = document.getElementById('tauxHoraire');
