@@ -840,24 +840,31 @@ function renderDashboard() {
     var dep = d.reduce(function(s, x) { return s + x.montant; }, 0);
     var sol = R.totalReel - dep;
     var jrs = new Set(h.map(function(x) { return x.date; })).size;
-
-        document.getElementById('totalRevenus').textContent = formatM(rev);
+    
+    document.getElementById('totalRevenus').textContent = formatM(rev);
     document.getElementById('totalDepenses').textContent = formatM(dep);
     document.getElementById('totalHeures').textContent = formatDuree(mins);
     document.getElementById('totalJours').textContent = jrs;
-    document.getElementById('solde').textContent = formatM(Math.abs(sol));
 
+    var soldeEl = document.getElementById('solde');
     var badge = document.getElementById('soldeBadge');
     var bar = document.getElementById('soldeBar');
+
     if (sol > 0) {
+        soldeEl.textContent = '+' + formatM(sol);
+        soldeEl.style.setProperty('color', '#00d2a0', 'important');
         badge.textContent = '✅ Positif'; badge.className = 'solde-badge positive';
         bar.style.width = (rev > 0 ? Math.min((sol/rev)*100, 100) : 0) + '%';
         bar.style.background = 'linear-gradient(90deg,#00d2a0,#55efc4)';
     } else if (sol < 0) {
+        soldeEl.textContent = '−' + formatM(Math.abs(sol));
+        soldeEl.style.setProperty('color', '#ff6b6b', 'important');
         badge.textContent = '⚠️ Déficit'; badge.className = 'solde-badge negative';
         bar.style.width = '100%';
         bar.style.background = 'linear-gradient(90deg,#ff6b6b,#fd79a8)';
     } else {
+        soldeEl.textContent = formatM(0);
+        soldeEl.style.removeProperty('color');
         badge.textContent = '⚖️ Équilibre'; badge.className = 'solde-badge neutral';
         bar.style.width = '50%';
     }
