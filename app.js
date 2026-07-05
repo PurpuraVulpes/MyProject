@@ -4,6 +4,7 @@ const App = {
     horaires: [],
     depenses: [],
     paiements: [],
+    extras: [],
     settings: { tauxHoraire: 12.00, devise: '€', arrondi: 'none' },
     activeTab: 'horaires'
 };
@@ -18,6 +19,18 @@ const CATEGORIES = [
     {emoji:'📱',label:'Téléphone'},{emoji:'⚡',label:'Énergie'},{emoji:'🎮',label:'Loisirs'},
     {emoji:'👕',label:'Vêtements'},{emoji:'💊',label:'Santé'},{emoji:'🛒',label:'Courses'},
     {emoji:'📦',label:'Abonnements'},{emoji:'🎓',label:'Éducation'},{emoji:'🔧',label:'Autre'}
+];
+const SOURCES_EXTRA = [
+    {emoji:'👨‍👩‍👧',label:'Famille'},
+    {emoji:'🎁',label:'Cadeau'},
+    {emoji:'💸',label:'Remboursement'},
+    {emoji:'🏷️',label:'Vente'},
+    {emoji:'🤝',label:'Aide'},
+    {emoji:'💼',label:'Freelance'},
+    {emoji:'🎰',label:'Gain'},
+    {emoji:'🏦',label:'Prêt'},
+    {emoji:'🔄',label:'Retour'},
+    {emoji:'💰',label:'Autre'}
 ];
 
 const CAT_COLORS = ['#9b59b6','#00d2a0','#e17055','#fdcb6e','#e84393','#a29bfe','#fd79a8','#74b9ff','#ff9f43','#55efc4','#c39bd3','#b2bec3'];
@@ -430,18 +443,21 @@ function loadData() {
         const h = localStorage.getItem('mb_horaires');
         const d = localStorage.getItem('mb_depenses');
         const p = localStorage.getItem('mb_paiements');
+        const e = localStorage.getItem('mb_extras');
         const s = localStorage.getItem('mb_settings');
         if (h) App.horaires = JSON.parse(h);
         if (d) App.depenses = JSON.parse(d);
         if (p) App.paiements = JSON.parse(p);
+        if (e) App.extras = JSON.parse(e);
         if (s) App.settings = { ...App.settings, ...JSON.parse(s) };
-    } catch (e) { console.error(e); }
+    } catch (er) { console.error(er); }
 }
 
 function saveData() {
     localStorage.setItem('mb_horaires', JSON.stringify(App.horaires));
     localStorage.setItem('mb_depenses', JSON.stringify(App.depenses));
     localStorage.setItem('mb_paiements', JSON.stringify(App.paiements));
+    localStorage.setItem('mb_extras', JSON.stringify(App.extras));
     localStorage.setItem('mb_settings', JSON.stringify(App.settings));
 }
 
@@ -458,7 +474,13 @@ function goTab(tab) {
     document.getElementById('mainScroll').scrollTo({ top: 0, behavior: 'smooth' });
     if (tab === 'resume') renderResume();
     if (tab === 'depenses') renderCatSummary();
-    if (tab === 'paiements') renderPaiements();
+    if (tab === 'paiements') { renderPaiements(); renderExtras(); }
+}
+
+function switchSubTab(sub) {
+    document.querySelectorAll('.sub-tab').forEach(t => t.classList.toggle('active', t.dataset.subtab === sub));
+    document.querySelectorAll('.sub-tab-content').forEach(c => c.classList.toggle('active', c.id === 'subtab-' + sub));
+    if (sub === 'extra') renderExtras();
 }
 
 function initTabs() {
@@ -466,6 +488,8 @@ function initTabs() {
     document.getElementById('btnToggleFormD').addEventListener('click', () => toggleForm('formCardD', 'btnToggleFormD'));
     const btnP = document.getElementById('btnToggleFormP');
     if (btnP) btnP.addEventListener('click', () => toggleForm('formCardP', 'btnToggleFormP'));
+    const btnE = document.getElementById('btnToggleFormE');
+    if (btnE) btnE.addEventListener('click', () => toggleForm('formCardE', 'btnToggleFormE'));
 }
 
 function toggleForm(cardId, btnId) {
@@ -481,6 +505,19 @@ function buildCategoryGrid() {
     document.getElementById('catGrid').innerHTML = CATEGORIES.map(c =>
         `<div class="cat-chip" onclick="selectCat(this,'${c.emoji} ${c.label}')"><span class="cat-emoji">${c.emoji}</span>${c.label}</div>`
     ).join('');
+
+    const extraGrid = document.getElementById('extraGrid');
+    if (extraGrid) {
+        extraGrid.innerHTML = SOURCES_EXTRA.map(c =>
+            `<div class="cat-chip" onclick="selectExtraSource(this,'${c.emoji} ${c.label}')"><span class="cat-emoji">${c.emoji}</span>${c.label}</div>`
+        ).join('');
+    }
+}
+
+function selectExtraSource(el, val) {
+    document.querySelectorAll('#extraGrid .cat-chip').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+    document.getElementById('sourceExtra').value = val;
 }
 
 function selectCat(el, val) {
@@ -495,6 +532,10 @@ function setDefaultDates() {
     document.getElementById('dateDepense').value = today;
     const mp = document.getElementById('moisPaiement');
     if (mp) mp.value = month;
+    const de = document.getElementById('dateExtra');
+    if (de) de.value = today;
+    const fem = document.getElementById('filtreExtraMois');
+    if (fem) fem.value = month;
     document.getElementById('filtreHoraireMois').value = month;
     document.getElementById('filtreDepenseMois').value = month;
     document.getElementById('filtreResumeMois').value = month;
@@ -524,6 +565,8 @@ function initForms() {
     if (fp) fp.addEventListener('submit', e => { e.preventDefault(); addPaiement(); });
     const qp = document.getElementById('btnQuickPaie');
     if (qp) qp.addEventListener('click', quickAddPaiement);
+    const fe = document.getElementById('formExtra');
+    if (fe) fe.addEventListener('submit', e => { e.preventDefault(); addExtra(); });
 }
 
 function updatePreview() {
@@ -727,11 +770,18 @@ function initMonthFilters() {
     document.getElementById('prevR').addEventListener('click', () => changeMonth('filtreResumeMois', -1, renderResume));
     document.getElementById('nextR').addEventListener('click', () => changeMonth('filtreResumeMois', 1, renderResume));
 
-    const fa = document.getElementById('filtreAnneeP');
+        const fa = document.getElementById('filtreAnneeP');
     if (fa) {
         fa.addEventListener('change', renderPaiements);
         document.getElementById('prevYearP').addEventListener('click', () => { fa.value = parseInt(fa.value) - 1; renderPaiements(); });
         document.getElementById('nextYearP').addEventListener('click', () => { fa.value = parseInt(fa.value) + 1; renderPaiements(); });
+    }
+
+    const fem = document.getElementById('filtreExtraMois');
+    if (fem) {
+        fem.addEventListener('change', renderExtras);
+        document.getElementById('prevE').addEventListener('click', () => changeMonth('filtreExtraMois', -1, renderExtras));
+        document.getElementById('nextE').addEventListener('click', () => changeMonth('filtreExtraMois', 1, renderExtras));
     }
 }
 
@@ -753,7 +803,13 @@ function renderAll() { renderDashboard(); renderHoraires(); renderQuickStatsH();
 function renderDashboard() {
     const m = curM(), h = getH(m), d = getD(m);
     const mins = h.reduce((s, x) => s + x.minutes, 0);
-    const rev = h.reduce((s, x) => s + x.gain, 0);
+    const revEstim = h.reduce((s, x) => s + x.gain, 0);
+    const paieMoisAll = getPaiementsForMonth(m);
+    const paieRecue = paieMoisAll.reduce((s, p) => s + p.montant, 0);
+    const extras = getExtrasForMonth(m);
+    const totalExtras = extras.reduce((s, e) => s + e.montant, 0);
+    // Revenus réels = paie reçue (ou estimation si pas de paie) + extras
+    const rev = (paieRecue > 0 ? paieRecue : revEstim) + totalExtras;
     const dep = d.reduce((s, x) => s + x.montant, 0);
     const sol = rev - dep;
     const jrs = new Set(h.map(x => x.date)).size;
@@ -840,7 +896,10 @@ function renderResume() {
     const h = getH(m), d = getD(m);
     const paieMois = getPaiementsForMonth(m);
     const paieRecue = paieMois.reduce((s, p) => s + p.montant, 0);
-    const rev = paieRecue > 0 ? paieRecue : h.reduce((s,x) => s+x.gain,0);
+    const extras = getExtrasForMonth(m);
+    const totalExtras = extras.reduce((s, e) => s + e.montant, 0);
+    const revBase = paieRecue > 0 ? paieRecue : h.reduce((s,x) => s+x.gain,0);
+    const rev = revBase + totalExtras;
     const dep = d.reduce((s,x) => s+x.montant,0), sol = rev-dep;
     const jrs = new Set(h.map(x => x.date)).size, mins = h.reduce((s,x) => s+x.minutes,0);
 
@@ -911,8 +970,8 @@ function initSettings() {
         renderAll(); showToast('⚙️ Sauvegardé !');
     });
 
-    document.getElementById('btnExport').addEventListener('click', () => {
-        const blob = new Blob([JSON.stringify({ horaires: App.horaires, depenses: App.depenses, paiements: App.paiements, settings: App.settings, exportDate: new Date().toISOString() }, null, 2)], { type: 'application/json' });
+document.getElementById('btnExport').addEventListener('click', () => {
+    const blob = new Blob([JSON.stringify({ horaires: App.horaires, depenses: App.depenses, paiements: App.paiements, extras: App.extras, settings: App.settings, exportDate: new Date().toISOString() }, null, 2)], { type: 'application/json' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob); a.download = `monbudget_${todayStr()}.json`; a.click();
         showToast('📤 Exporté !');
@@ -926,9 +985,10 @@ function initSettings() {
             try {
                 const data = JSON.parse(ev.target.result);
                 if (data.horaires) App.horaires = data.horaires;
-                if (data.depenses) App.depenses = data.depenses;
-                if (data.paiements) App.paiements = data.paiements;
-                if (data.settings) App.settings = { ...App.settings, ...data.settings };
+if (data.depenses) App.depenses = data.depenses;
+if (data.paiements) App.paiements = data.paiements;
+if (data.extras) App.extras = data.extras;
+if (data.settings) App.settings = { ...App.settings, ...data.settings };
                 saveData(); setDefaultDates(); renderAll();
                 if (typeof currentUser !== 'undefined' && currentUser && !isGuestMode) {
                     localStorage.removeItem('mb_uploaded_' + currentUser.uid);
@@ -941,14 +1001,14 @@ function initSettings() {
         e.target.value = '';
     });
 
-    document.getElementById('btnReset').addEventListener('click', () => {
-        showConfirm('⚠️ Tout supprimer ?', 'Données locales ET cloud effacées.', async () => {
-            App.horaires = []; App.depenses = []; App.paiements = [];
-            saveData();
-            if (typeof cloudDeleteAll === 'function') await cloudDeleteAll();
-            renderAll(); showToast('🗑️ Tout supprimé');
-        });
+   document.getElementById('btnReset').addEventListener('click', () => {
+    showConfirm('⚠️ Tout supprimer ?', 'Données locales ET cloud effacées.', async () => {
+        App.horaires = []; App.depenses = []; App.paiements = []; App.extras = [];
+        saveData();
+        if (typeof cloudDeleteAll === 'function') await cloudDeleteAll();
+        renderAll(); showToast('🗑️ Tout supprimé');
     });
+});
 }
 
 function showConfirm(title, msg, onConfirm) {
@@ -968,6 +1028,76 @@ function showToast(msg) {
     t.textContent = msg; t.className = 'toast show';
     clearTimeout(t._timer);
     t._timer = setTimeout(() => { t.className = 'toast'; }, 2800);
+}
+
+// ===== EXTRA REVENUS =====
+function getExtrasForMonth(m) { return App.extras.filter(e => e.date.startsWith(m)); }
+
+function addExtra() {
+    const date = document.getElementById('dateExtra').value;
+    const montant = parseFloat(document.getElementById('montantExtra').value);
+    const source = document.getElementById('sourceExtra').value;
+    const description = document.getElementById('descriptionExtra').value.trim();
+
+    if (!date || !montant || montant <= 0) { showToast('⚠️ Remplissez date et montant'); return; }
+    if (!source) { showToast('⚠️ Choisissez une source'); return; }
+
+    const extra = { id: Date.now(), date, montant, source, description };
+    App.extras.push(extra);
+    App.extras.sort((a, b) => b.date.localeCompare(a.date));
+    saveData();
+    if (typeof cloudAddExtra === 'function') cloudAddExtra(extra);
+    renderAll();
+    renderExtras();
+    showToast(`✅ +${formatM(montant)} enregistré !`);
+
+    document.getElementById('montantExtra').value = '';
+    document.getElementById('descriptionExtra').value = '';
+    document.querySelectorAll('#extraGrid .cat-chip').forEach(c => c.classList.remove('selected'));
+    document.getElementById('sourceExtra').value = '';
+    toggleForm('formCardE', 'btnToggleFormE');
+}
+
+function deleteExtra(id) {
+    showConfirm('Supprimer ?', 'Supprimer ce revenu ?', () => {
+        App.extras = App.extras.filter(e => e.id !== id);
+        saveData();
+        if (typeof cloudDeleteExtra === 'function') cloudDeleteExtra(id);
+        renderAll();
+        renderExtras();
+        showToast('🗑️ Supprimé');
+    });
+}
+
+function renderExtras() {
+    const m = document.getElementById('filtreExtraMois');
+    if (!m) return;
+    const monthStr = m.value;
+    const extras = getExtrasForMonth(monthStr);
+    const total = extras.reduce((s, e) => s + e.montant, 0);
+
+    document.getElementById('qsNbE').textContent = extras.length;
+    document.getElementById('qsTotalE').textContent = formatM(total);
+    document.getElementById('qsMoyE').textContent = formatM(extras.length ? total/extras.length : 0);
+
+    // Source summary
+    const summary = document.getElementById('sourceSummary');
+    if (extras.length > 0) {
+        const sources = {};
+        extras.forEach(e => { sources[e.source] = (sources[e.source]||0) + e.montant; });
+        const sorted = Object.entries(sources).sort((a,b) => b[1]-a[1]);
+        const max = sorted[0][1];
+        summary.innerHTML = sorted.map(([src, amt], i) =>
+            `<div class="cat-row"><span class="cat-name">${src}</span><div class="cat-track"><div class="cat-fill" style="width:${(amt/max)*100}%;background:${CAT_COLORS[i%CAT_COLORS.length]}"></div></div><span class="cat-amount" style="color:var(--green)">${formatM(amt)}</span></div>`
+        ).join('');
+    } else {
+        summary.innerHTML = '';
+    }
+
+    // List
+    const c = document.getElementById('listeExtras');
+    if (!extras.length) { c.innerHTML = '<p class="empty-state">🎁 Aucun revenu ce mois.</p>'; return; }
+    c.innerHTML = extras.map(e => `<div class="list-item"><div class="list-item-icon">${e.source.split(' ')[0]}</div><div class="list-item-body"><div class="list-item-title">${e.description || e.source}</div><div class="list-item-sub">${e.source} · ${formatDate(e.date)}</div></div><div class="list-item-right"><span class="list-item-amount amount-green">+${formatM(e.montant)}</span><button class="delete-btn" onclick="deleteExtra(${e.id})">🗑️</button></div></div>`).join('');
 }
 
 function calcMinutes(d, f, p=0) {
