@@ -104,17 +104,16 @@ function computeMonthlyRevenue(monthStr) {
     var prevMonth = getPreviousMonth(monthStr);
     var horairesPrec = getH(prevMonth);
     var gainPrevu = horairesPrec.reduce(function(s, x) { return s + x.gain; }, 0);
-    var salaireEffectif = paieRecue > 0 ? paieRecue : gainPrevu;
     var salaireEstime = paieRecue === 0 && gainPrevu > 0;
     return {
         paieRecue: paieRecue,
         gainPrevu: gainPrevu,
-        salaireEffectif: salaireEffectif,
         salaireEstime: salaireEstime,
         totalExtras: totalExtras,
         nbPaies: paieMois.length,
         nbExtras: extras.length,
-        total: salaireEffectif + totalExtras
+        totalReel: paieRecue + totalExtras,
+        totalEstime: gainPrevu + totalExtras
     };
 }
 
@@ -683,9 +682,9 @@ function renderDashboard() {
     var d = getD(m);
     var mins = h.reduce(function(s, x) { return s + x.minutes; }, 0);
     var R = computeMonthlyRevenue(m);
-    var rev = R.total;
+    var rev = R.salaireEstime ? R.totalEstime : R.totalReel;
     var dep = d.reduce(function(s, x) { return s + x.montant; }, 0);
-    var sol = rev - dep;
+    var sol = R.totalReel - dep;
     var jrs = new Set(h.map(function(x) { return x.date; })).size;
 
     document.getElementById('totalRevenus').textContent = formatM(rev);
@@ -911,9 +910,9 @@ function renderResume() {
     var h = getH(m);
     var d = getD(m);
     var R = computeMonthlyRevenue(m);
-    var rev = R.total;
+    var rev = R.salaireEstime ? R.totalEstime : R.totalReel;
     var dep = d.reduce(function(s, x) { return s + x.montant; }, 0);
-    var sol = rev - dep;
+    var sol = R.totalReel - dep;
     var jrs = new Set(h.map(function(x) { return x.date; })).size;
     var mins = h.reduce(function(s, x) { return s + x.minutes; }, 0);
 
