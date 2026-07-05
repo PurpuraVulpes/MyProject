@@ -1148,3 +1148,191 @@ body {
     border-color: var(--primary);
     font-size: 0.9rem;
 }
+
+/* ===== EPARGNE ===== */
+.epargne-solde-card {
+    background: linear-gradient(135deg, var(--card), var(--card2));
+    border-radius: var(--radius);
+    border: 1px solid var(--primary);
+    padding: 24px;
+    margin-bottom: 16px;
+    text-align: center;
+    box-shadow: 0 0 25px var(--primary-glow);
+}
+
+.epargne-solde-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.epargne-icon { font-size: 2rem; }
+.epargne-solde-header strong { display: block; font-size: 1rem; }
+.epargne-solde-header small { font-size: 0.78rem; color: var(--text2); }
+
+.epargne-montant {
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: var(--primary-light);
+    letter-spacing: -1px;
+}
+
+.epargne-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.epargne-action-btn {
+    padding: 18px 12px;
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--card);
+    cursor: pointer;
+    font-family: inherit;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.15s;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.epargne-action-btn:active { transform: scale(0.95); }
+
+.epargne-action-btn.deposit {
+    border-color: var(--green);
+    background: var(--green-glow);
+}
+
+.epargne-action-btn.withdraw {
+    border-color: var(--yellow);
+    background: rgba(255,209,102,0.1);
+}
+
+.ea-icon { font-size: 1.8rem; }
+.ea-text { font-size: 0.85rem; font-weight: 700; color: var(--text); }
+
+/* ===== SHOPPING LIST ===== */
+.prio-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+
+.prio-btn {
+    padding: 10px 6px;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg3);
+    color: var(--text2);
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s;
+    -webkit-tap-highlight-color: transparent;
+    text-align: center;
+}
+
+.prio-btn.active {
+    border-color: var(--primary);
+    background: var(--purple-glow);
+    color: var(--text);
+}
+
+.prio-btn[data-prio="urgent"].active {
+    border-color: var(--red);
+    background: var(--red-glow);
+}
+
+.prio-btn[data-prio="envie"].active {
+    border-color: var(--yellow);
+    background: rgba(255,209,102,0.15);
+}
+
+.shop-summary {
+    background: var(--card);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    padding: 14px;
+    margin-bottom: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.shop-summary:empty { display: none; }
+
+.shop-total-label { font-size: 0.85rem; color: var(--text2); font-weight: 600; }
+.shop-total-amount { font-size: 1.1rem; font-weight: 800; color: var(--primary-light); }
+
+.shop-item {
+    background: var(--card);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: all 0.2s;
+}
+
+.shop-item.bought {
+    opacity: 0.5;
+}
+
+.shop-item.bought .shop-item-name {
+    text-decoration: line-through;
+}
+
+.shop-checkbox {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    flex-shrink: 0;
+    -webkit-tap-highlight-color: transparent;
+    transition: all 0.2s;
+}
+
+.shop-checkbox.checked {
+    background: var(--green);
+    border-color: var(--green);
+    color: white;
+}
+
+.shop-item-body { flex: 1; min-width: 0; }
+.shop-item-name { font-size: 0.9rem; font-weight: 600; }
+.shop-item-note { font-size: 0.75rem; color: var(--text2); margin-top: 2px; }
+
+.shop-item-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.shop-item-price { font-size: 0.9rem; font-weight: 700; color: var(--primary-light); }
+
+.prio-tag {
+    font-size: 0.65rem;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-weight: 600;
+}
+
+.prio-tag.urgent { background: var(--red-glow); color: var(--red); }
+.prio-tag.normal { background: var(--purple-glow); color: var(--primary-light); }
+.prio-tag.envie { background: rgba(255,209,102,0.15); color: var(--yellow); }
+
