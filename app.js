@@ -8,6 +8,7 @@ const App = {
     extras: [],
     epargne: [],
     shopping: [],
+    objectifs: [],
     settings: { tauxHoraire: 12.00, devise: '€', arrondi: 'none', theme: 'purple' },
     activeTab: 'horaires'
 };
@@ -97,6 +98,22 @@ function formatMonthLong(m) {
     return months[parts[1]-1] + ' ' + parts[0];
 }
 
+function formatMonthYear(date) {
+    if (!date) return '';
+    var months = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
+    return months[date.getMonth()] + ' ' + date.getFullYear();
+}
+
+function formatDuration(mois) {
+    if (mois === Infinity) return 'Jamais';
+    if (mois === 0) return 'Atteint !';
+    if (mois < 12) return mois + ' mois';
+    var y = Math.floor(mois / 12);
+    var m = mois % 12;
+    if (m === 0) return y + ' an' + (y > 1 ? 's' : '');
+    return y + ' an' + (y > 1 ? 's' : '') + ' et ' + m + ' mois';
+}
+
 function changeMonth(id, delta, cb) {
     var input = document.getElementById(id);
     if (!input.value) return;
@@ -136,6 +153,7 @@ function loadData() {
         var e = localStorage.getItem('mb_extras');
         var ep = localStorage.getItem('mb_epargne');
         var sh = localStorage.getItem('mb_shopping');
+        var ob = localStorage.getItem('mb_objectifs');
         var s = localStorage.getItem('mb_settings');
         if (h) App.horaires = JSON.parse(h);
         if (d) App.depenses = JSON.parse(d);
@@ -143,6 +161,7 @@ function loadData() {
         if (e) App.extras = JSON.parse(e);
         if (ep) App.epargne = JSON.parse(ep);
         if (sh) App.shopping = JSON.parse(sh);
+        if (ob) App.objectifs = JSON.parse(ob);
         if (s) App.settings = Object.assign({}, App.settings, JSON.parse(s));
     } catch (er) { console.error(er); }
 }
@@ -154,6 +173,7 @@ function saveData() {
     localStorage.setItem('mb_extras', JSON.stringify(App.extras));
     localStorage.setItem('mb_epargne', JSON.stringify(App.epargne));
     localStorage.setItem('mb_shopping', JSON.stringify(App.shopping));
+    localStorage.setItem('mb_objectifs', JSON.stringify(App.objectifs));
     localStorage.setItem('mb_settings', JSON.stringify(App.settings));
 }
 
@@ -664,6 +684,50 @@ function addExtra() {
     toggleForm('formCardE', 'btnToggleFormE');
 }
 
+// ===== REPORT SOLDE =====
+function getReportForMonth(monthStr) {
+    return App.extras.find(function(e) {
+        return e.date.startsWith(monthStr) && e.source === '📅 Report' && e.isReport === true;
+    });
+}
+
+function reportSoldeToNextMonth(fromMonth) {
+    var d = getD(fromMonth);
+    var R = computeMonthlyRevenue(fromMonth);
+    var dep = d.reduce(function(s, x) { return s + x.montant; }, 0);
+    var reste = R.totalReel - dep;
+    if (reste <= 0) { showToast('⚠️ Aucun solde positif à reporter'); return; }
+    var nextMonth = getNextMonth(fromMonth);
+    var existing = getReportForMonth(nextMonth);
+    if (existing) {
+        showConfirm('Report déjà fait', 'Un report existe déjà pour ' + formatMonthLong(nextMonth) + '. Le remplacer ?', function() {
+            App.extras = App.extras.filter(function(e) { return e.id !== existing.id; });
+            createReport(fromMonth, nextMonth, reste);
+        });
+    } else {
+        createReport(fromMonth, nextMonth, reste);
+    }
+}
+
+function createReport(fromMonth, toMonth, montant) {
+    var dateReport = toMonth + '-01';
+    var extra = {
+        id: Date.now(),
+        date: dateReport,
+        montant: montant,
+        source: '📅 Report',
+        description: 'Reste de ' + formatMonthLong(fromMonth),
+        isReport: true
+    };
+    App.extras.push(extra);
+    App.extras.sort(function(a, b) { return b.date.localeCompare(a.date); });
+    saveData();
+    if (typeof cloudAddExtra === 'function') cloudAddExtra(extra);
+    renderAll();
+    renderResume();
+    showToast('✅ ' + formatM(montant) + ' reporté à ' + formatMonthShort(toMonth) + ' !');
+}
+
 // ===== EPARGNE =====
 function openEpargneForm(mode) {
     epargneMode = mode;
@@ -776,6 +840,113 @@ function switchBudgetTab(sub) {
     if (sub === 'shopping-list') renderShopping();
 }
 
+// ===== OBJECTIFS =====
+function selectEmoji(el, val) {
+    document.querySelectorAll('.emoji-chip').forEach(function(c) { c.classList.remove('active'); });
+    el.classList.add('active');
+    document.getElementById('emojiObjectif').value = val;
+}
+
+function calculateObjectif(objectif, mensuel, deja) {
+    var restant = objectif - deja;
+    if (restant <= 0) return { done: true, mois: 0, date: null, percent: 100 };
+    if (mensuel <= 0) return { done: false, mois: Infinity, date: null, percent: (deja/objectif)*100 };
+    var mois = Math.ceil(restant / mensuel);
+    var now = new Date();
+    var target = new Date(now.getFullYear(), now.getMonth() + mois, 1);
+    var percent = (deja/objectif) * 100;
+    return { done: false, mois: mois, date: target, percent: percent };
+}
+
+function updateCalcResult() {
+    var objectif = parseFloat(document.getElementById('calcObjectif').value) || 0;
+    var mensuel = parseFloat(document.getElementById('calcMensuel').value) || 0;
+    var deja = parseFloat(document.getElementById('calcDeja').value) || 0;
+    var result = document.getElementById('calcResult');
+    var text = document.getElementById('calcResultText');
+    var icon = result.querySelector('.calc-result-icon');
+    if (objectif <= 0 || mensuel <= 0) {
+        text.textContent = 'Entrez un montant et une épargne mensuelle';
+        text.className = 'calc-result-text';
+        icon.textContent = '⏱️';
+        return;
+    }
+    var calc = calculateObjectif(objectif, mensuel, deja);
+    if (calc.done) {
+        icon.textContent = '🎉';
+        text.innerHTML = '<strong>Objectif atteint !</strong><br>Vous avez déjà ' + formatM(deja) + ' sur ' + formatM(objectif);
+        text.className = 'calc-result-text done';
+    } else {
+        icon.textContent = '⏱️';
+        var dateStr = calc.date ? ' → <strong>' + formatMonthYear(calc.date) + '</strong>' : '';
+        text.innerHTML = 'Il vous faudra <strong>' + formatDuration(calc.mois) + '</strong>' + dateStr +
+            '<br><small style="color:var(--text2);font-size:0.75rem">(' + Math.round(calc.percent) + '% déjà atteint)</small>';
+        text.className = 'calc-result-text';
+    }
+}
+
+function addObjectif() {
+    var nom = document.getElementById('nomObjectif').value.trim();
+    var montant = parseFloat(document.getElementById('montantObjectif').value);
+    var mensuel = parseFloat(document.getElementById('mensuelObjectif').value);
+    var deja = parseFloat(document.getElementById('dejaObjectif').value) || 0;
+    var emoji = document.getElementById('emojiObjectif').value || '🎯';
+    if (!nom || !montant || montant <= 0 || !mensuel || mensuel <= 0) {
+        showToast('⚠️ Remplissez tous les champs');
+        return;
+    }
+    var obj = {
+        id: Date.now(), nom: nom, montant: montant, mensuel: mensuel,
+        deja: deja, emoji: emoji, dateCreation: todayStr()
+    };
+    App.objectifs.push(obj);
+    saveData();
+    if (typeof cloudAddObjectif === 'function') cloudAddObjectif(obj);
+    renderObjectifs();
+    showToast('✅ Objectif créé !');
+    document.getElementById('nomObjectif').value = '';
+    document.getElementById('montantObjectif').value = '';
+    document.getElementById('mensuelObjectif').value = '';
+    document.getElementById('dejaObjectif').value = '0';
+    toggleForm('formCardObj', 'btnToggleFormObj');
+}
+
+function updateObjectifDeja(id, delta) {
+    var obj = App.objectifs.find(function(o) { return o.id === id; });
+    if (!obj) return;
+    var newDeja = Math.max(0, obj.deja + delta);
+    obj.deja = newDeja;
+    saveData();
+    if (typeof cloudAddObjectif === 'function') cloudAddObjectif(obj);
+    renderObjectifs();
+    if (delta > 0) showToast('✅ +' + formatM(delta) + ' ajouté');
+    else showToast('➖ ' + formatM(Math.abs(delta)) + ' retiré');
+}
+
+function editObjectifDeja(id) {
+    var obj = App.objectifs.find(function(o) { return o.id === id; });
+    if (!obj) return;
+    var newVal = prompt('Nouveau montant déjà épargné (actuellement ' + formatM(obj.deja) + ') :', obj.deja);
+    if (newVal === null) return;
+    var val = parseFloat(newVal);
+    if (isNaN(val) || val < 0) { showToast('⚠️ Montant invalide'); return; }
+    obj.deja = val;
+    saveData();
+    if (typeof cloudAddObjectif === 'function') cloudAddObjectif(obj);
+    renderObjectifs();
+    showToast('✅ Montant mis à jour');
+}
+
+function deleteObjectif(id) {
+    showConfirm('Supprimer ?', 'Supprimer cet objectif ?', function() {
+        App.objectifs = App.objectifs.filter(function(o) { return o.id !== id; });
+        saveData();
+        if (typeof cloudDeleteObjectif === 'function') cloudDeleteObjectif(id);
+        renderObjectifs();
+        showToast('🗑️ Supprimé');
+    });
+}
+
 // ===== DELETE FUNCTIONS =====
 function deleteHoraire(id) {
     showConfirm('Supprimer ?', 'Supprimer cet horaire ?', function() {
@@ -817,59 +988,6 @@ function deleteExtra(id) {
     });
 }
 
-// ===== REPORT SOLDE MOIS PRECEDENT =====
-function getReportForMonth(monthStr) {
-    // Cherche si un report existe déjà pour ce mois
-    return App.extras.find(function(e) {
-        return e.date.startsWith(monthStr) && e.source === '📅 Report' && e.isReport === true;
-    });
-}
-
-function calculateMonthReste(monthStr) {
-    // Calcule ce qui reste réellement à la fin d'un mois donné
-    var d = getD(monthStr);
-    var R = computeMonthlyRevenue(monthStr);
-    var dep = d.reduce(function(s, x) { return s + x.montant; }, 0);
-    return R.totalReel - dep;
-}
-
-function reportSoldeToNextMonth(fromMonth) {
-    var reste = calculateMonthReste(fromMonth);
-    if (reste <= 0) { showToast('⚠️ Aucun solde positif à reporter'); return; }
-
-    var nextMonth = getNextMonth(fromMonth);
-    var existing = getReportForMonth(nextMonth);
-    if (existing) {
-        showConfirm('Report déjà fait', 'Un report existe déjà pour ' + formatMonthLong(nextMonth) + '. Le remplacer ?', function() {
-            App.extras = App.extras.filter(function(e) { return e.id !== existing.id; });
-            createReport(fromMonth, nextMonth, reste);
-        });
-    } else {
-        createReport(fromMonth, nextMonth, reste);
-    }
-}
-
-function createReport(fromMonth, toMonth, montant) {
-    // Créer une entrée d'extra "Report" dans le mois suivant
-    var parts = toMonth.split('-').map(Number);
-    var dateReport = toMonth + '-01'; // 1er du mois suivant
-    var extra = {
-        id: Date.now(),
-        date: dateReport,
-        montant: montant,
-        source: '📅 Report',
-        description: 'Reste de ' + formatMonthLong(fromMonth),
-        isReport: true
-    };
-    App.extras.push(extra);
-    App.extras.sort(function(a, b) { return b.date.localeCompare(a.date); });
-    saveData();
-    if (typeof cloudAddExtra === 'function') cloudAddExtra(extra);
-    renderAll();
-    renderResume();
-    showToast('✅ ' + formatM(montant) + ' reporté à ' + formatMonthShort(toMonth) + ' !');
-}
-
 // ===== RENDER ALL =====
 function renderAll() {
     renderDashboard();
@@ -880,6 +998,7 @@ function renderAll() {
     renderQuickStatsD();
     if (typeof renderEpargne === 'function') renderEpargne();
     if (typeof renderShopping === 'function') renderShopping();
+    if (typeof renderObjectifs === 'function') renderObjectifs();
 }
 
 // ===== RENDER DASHBOARD =====
@@ -893,7 +1012,7 @@ function renderDashboard() {
     var dep = d.reduce(function(s, x) { return s + x.montant; }, 0);
     var sol = R.totalReel - dep;
     var jrs = new Set(h.map(function(x) { return x.date; })).size;
-    
+
     document.getElementById('totalRevenus').textContent = formatM(rev);
     document.getElementById('totalDepenses').textContent = formatM(dep);
     document.getElementById('totalHeures').textContent = formatDuree(mins);
@@ -922,7 +1041,6 @@ function renderDashboard() {
         bar.style.width = '50%';
     }
 
-    // Breakdown revenus
     var bd = document.getElementById('revenusBreakdown');
     var badgeR = document.getElementById('revenusBadge');
     if (bd) {
@@ -943,7 +1061,6 @@ function renderDashboard() {
         }
     }
 
-    // Card Paie
     var paieMois = getPaiementsForMonth(m);
     var totalPaie = paieMois.reduce(function(s, p) { return s + p.montant; }, 0);
     var paieBadge = document.getElementById('paieBadge');
@@ -1189,6 +1306,59 @@ function renderShopping() {
     }).join('');
 }
 
+// ===== RENDER OBJECTIFS =====
+function renderObjectifs() {
+    var c = document.getElementById('listeObjectifs');
+    if (!c) return;
+    if (!App.objectifs.length) {
+        c.innerHTML = '<p class="empty-state">🎯 Aucun objectif défini.<br><small>Créez-en un pour planifier vos économies !</small></p>';
+        return;
+    }
+    c.innerHTML = App.objectifs.map(function(o) {
+        var calc = calculateObjectif(o.montant, o.mensuel, o.deja);
+        var doneClass = calc.done ? ' done' : '';
+        var fillClass = calc.done ? ' done' : '';
+        var percentClass = calc.done ? ' done' : '';
+        var percentTxt = Math.min(100, Math.round(calc.percent));
+        var dateStr = calc.date ? formatMonthYear(calc.date) : '—';
+        var badge = calc.done ? '<span class="done-badge">✅ Atteint !</span>' : '';
+        return '<div class="objectif-card' + doneClass + '">' +
+            '<div class="objectif-header">' +
+                '<div class="objectif-emoji">' + o.emoji + '</div>' +
+                '<div class="objectif-info">' +
+                    '<div class="objectif-nom">' + o.nom + '</div>' +
+                    '<div class="objectif-cible">Objectif : ' + formatM(o.montant) + '</div>' +
+                '</div>' +
+                '<div class="objectif-actions">' + badge +
+                    '<button class="obj-action-btn" onclick="editObjectifDeja(' + o.id + ')" title="Modifier">✏️</button>' +
+                    '<button class="obj-action-btn danger" onclick="deleteObjectif(' + o.id + ')">🗑️</button>' +
+                '</div>' +
+            '</div>' +
+            '<div class="objectif-progress">' +
+                '<div class="progress-track"><div class="progress-fill' + fillClass + '" style="width:' + percentTxt + '%"></div></div>' +
+                '<div class="progress-info">' +
+                    '<span class="progress-percent' + percentClass + '">' + percentTxt + '%</span>' +
+                    '<span class="progress-amount">' + formatM(o.deja) + ' / ' + formatM(o.montant) + '</span>' +
+                '</div>' +
+            '</div>' +
+            '<div class="objectif-stats">' +
+                '<div class="obj-stat">' +
+                    '<span class="obj-stat-icon">💰</span>' +
+                    '<div class="obj-stat-text"><strong>' + formatM(o.mensuel) + '</strong><small>par mois</small></div>' +
+                '</div>' +
+                '<div class="obj-stat">' +
+                    '<span class="obj-stat-icon">🗓️</span>' +
+                    '<div class="obj-stat-text"><strong>' + (calc.done ? '—' : formatDuration(calc.mois)) + '</strong><small>' + (calc.done ? 'Terminé' : dateStr) + '</small></div>' +
+                '</div>' +
+            '</div>' +
+            (calc.done ? '' : '<div class="deja-adjust">' +
+                '<button class="deja-adjust-btn" onclick="updateObjectifDeja(' + o.id + ',-' + o.mensuel + ')">-' + formatM(o.mensuel) + '</button>' +
+                '<button class="deja-adjust-btn" onclick="updateObjectifDeja(' + o.id + ',' + o.mensuel + ')">+' + formatM(o.mensuel) + '</button>' +
+            '</div>') +
+        '</div>';
+    }).join('');
+}
+
 // ===== RENDER RESUME =====
 function renderResume() {
     var m = document.getElementById('filtreResumeMois').value;
@@ -1228,7 +1398,7 @@ function renderResume() {
     document.getElementById('progressGreen').style.width = (tot > 0 ? (rev/tot)*100 : 50) + '%';
     document.getElementById('progressRed').style.width = (tot > 0 ? (dep/tot)*100 : 50) + '%';
     var se = document.getElementById('bilanSolde');
-    se.textContent = (sol >= 0 ? '' : '-') + formatM(Math.abs(sol));
+    se.textContent = (sol >= 0 ? '' : '−') + formatM(Math.abs(sol));
     se.className = sol >= 0 ? 'positive' : 'negative';
     document.getElementById('bilanPercent').textContent = rev > 0 ? Math.round((dep/rev)*100) + '% dépensé' : 'Aucun revenu';
     document.getElementById('statJours').textContent = jrs;
@@ -1255,7 +1425,7 @@ function renderResume() {
     }
     ct.innerHTML = htmlChart || '<p style="color:var(--text2);text-align:center;width:100%">Aucune dépense</p>';
 
-        var tp = document.getElementById('topDepenses');
+    var tp = document.getElementById('topDepenses');
     if (!d.length) { tp.innerHTML = '<p style="color:var(--text2);text-align:center;padding:12px">Aucune</p>'; }
     else {
         tp.innerHTML = d.slice().sort(function(a, b) { return b.montant - a.montant; }).slice(0, 5).map(function(x) {
@@ -1271,22 +1441,34 @@ function renderResume() {
         var nextM = getNextMonth(m);
         var reste = sol;
         var existingReport = getReportForMonth(nextM);
-
         if (existingReport) {
             btnReport.style.display = 'block';
+            btnReport.disabled = false;
             btnReport.className = 'submit-btn outline';
-            btnText.textContent = '🔄 Remplacer le report existant';
-            reportHint.textContent = '✅ ' + formatM(existingReport.montant) + ' déjà reporté à ' + formatMonthShort(nextM);
+            btnText.textContent = '🔄 Remplacer le report (' + formatM(existingReport.montant) + ')';
+            reportHint.textContent = '✅ Déjà reporté à ' + formatMonthShort(nextM);
             reportHint.className = 'report-hint done';
         } else if (reste > 0) {
             btnReport.style.display = 'block';
+            btnReport.disabled = false;
             btnReport.className = 'submit-btn purple';
             btnText.textContent = '📅 Reporter ' + formatM(reste) + ' à ' + formatMonthShort(nextM);
             reportHint.textContent = 'Ajoute votre reste au mois suivant';
             reportHint.className = 'report-hint';
+        } else if (reste < 0) {
+            btnReport.style.display = 'block';
+            btnReport.disabled = true;
+            btnReport.className = 'submit-btn outline';
+            btnText.textContent = '⚠️ Déficit - Impossible de reporter';
+            reportHint.textContent = 'Vous êtes en déficit ce mois-ci';
+            reportHint.className = 'report-hint';
         } else {
-            btnReport.style.display = 'none';
+            btnReport.style.display = 'block';
+            btnReport.disabled = true;
+            btnReport.className = 'submit-btn outline';
+            btnText.textContent = '⚖️ Équilibre - Rien à reporter';
             reportHint.textContent = '';
+            reportHint.className = 'report-hint';
         }
     }
 }
@@ -1311,6 +1493,7 @@ function goTab(tab) {
         if (typeof renderExtras === 'function') renderExtras();
     }
     if (tab === 'epargne' && typeof renderEpargne === 'function') renderEpargne();
+    if (tab === 'objectifs' && typeof renderObjectifs === 'function') renderObjectifs();
 }
 
 function switchSubTab(sub) {
@@ -1467,6 +1650,14 @@ function initForms() {
 
     var fsh = document.getElementById('formShop');
     if (fsh) fsh.addEventListener('submit', function(e) { e.preventDefault(); addShopItem(); });
+
+    var fobj = document.getElementById('formObjectif');
+    if (fobj) fobj.addEventListener('submit', function(e) { e.preventDefault(); addObjectif(); });
+
+    ['calcObjectif', 'calcMensuel', 'calcDeja'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener('input', updateCalcResult);
+    });
 }
 
 // ===== INIT TAB TOGGLES =====
@@ -1479,6 +1670,8 @@ function initTabs() {
     if (btnE) btnE.addEventListener('click', function() { toggleForm('formCardE', 'btnToggleFormE'); });
     var btnShop = document.getElementById('btnToggleFormShop');
     if (btnShop) btnShop.addEventListener('click', function() { toggleForm('formCardShop', 'btnToggleFormShop'); });
+    var btnObj = document.getElementById('btnToggleFormObj');
+    if (btnObj) btnObj.addEventListener('click', function() { toggleForm('formCardObj', 'btnToggleFormObj'); });
 }
 
 // ===== INIT MONTH FILTERS =====
@@ -1521,9 +1714,9 @@ function initMonthFilters() {
         document.getElementById('nextE').addEventListener('click', function() { changeMonth('filtreExtraMois', 1, renderExtras); });
     }
 
-    var fep = document.getElementById('filtreEpargneMois');
-    if (fep) {
-        fep.addEventListener('change', renderEpargne);
+    var fepM = document.getElementById('filtreEpargneMois');
+    if (fepM) {
+        fepM.addEventListener('change', renderEpargne);
         document.getElementById('prevEpargne').addEventListener('click', function() { changeMonth('filtreEpargneMois', -1, renderEpargne); });
         document.getElementById('nextEpargne').addEventListener('click', function() { changeMonth('filtreEpargneMois', 1, renderEpargne); });
     }
@@ -1556,7 +1749,6 @@ function initThemeSelector() {
 function initSettings() {
     initThemeSelector();
 
-    // Bouton report solde
     var btnReport = document.getElementById('btnReportSolde');
     if (btnReport) {
         btnReport.addEventListener('click', function() {
@@ -1633,6 +1825,7 @@ function initSettings() {
             extras: App.extras,
             epargne: App.epargne,
             shopping: App.shopping,
+            objectifs: App.objectifs,
             settings: App.settings,
             exportDate: new Date().toISOString()
         };
@@ -1657,6 +1850,7 @@ function initSettings() {
                 if (data.extras) App.extras = data.extras;
                 if (data.epargne) App.epargne = data.epargne;
                 if (data.shopping) App.shopping = data.shopping;
+                if (data.objectifs) App.objectifs = data.objectifs;
                 if (data.settings) App.settings = Object.assign({}, App.settings, data.settings);
                 saveData();
                 setDefaultDates();
@@ -1680,6 +1874,7 @@ function initSettings() {
             App.extras = [];
             App.epargne = [];
             App.shopping = [];
+            App.objectifs = [];
             saveData();
             if (typeof cloudDeleteAll === 'function') await cloudDeleteAll();
             renderAll();
