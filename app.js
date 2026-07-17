@@ -923,6 +923,24 @@ function updateObjectifDeja(id, delta) {
     else showToast('➖ ' + formatM(Math.abs(delta)) + ' retiré');
 }
 
+function addCustomAmount(id) {
+    var input = document.getElementById('dejaCustom' + id);
+    if (!input) return;
+    var val = parseFloat(input.value);
+    if (isNaN(val) || val <= 0) { showToast('⚠️ Entrez un montant valide'); return; }
+    updateObjectifDeja(id, val);
+    input.value = '';
+}
+
+function subCustomAmount(id) {
+    var input = document.getElementById('dejaCustom' + id);
+    if (!input) return;
+    var val = parseFloat(input.value);
+    if (isNaN(val) || val <= 0) { showToast('⚠️ Entrez un montant valide'); return; }
+    updateObjectifDeja(id, -val);
+    input.value = '';
+}
+
 function editObjectifDeja(id) {
     var obj = App.objectifs.find(function(o) { return o.id === id; });
     if (!obj) return;
@@ -1351,9 +1369,18 @@ function renderObjectifs() {
                     '<div class="obj-stat-text"><strong>' + (calc.done ? '—' : formatDuration(calc.mois)) + '</strong><small>' + (calc.done ? 'Terminé' : dateStr) + '</small></div>' +
                 '</div>' +
             '</div>' +
-            (calc.done ? '' : '<div class="deja-adjust">' +
-                '<button class="deja-adjust-btn" onclick="updateObjectifDeja(' + o.id + ',-' + o.mensuel + ')">-' + formatM(o.mensuel) + '</button>' +
-                '<button class="deja-adjust-btn" onclick="updateObjectifDeja(' + o.id + ',' + o.mensuel + ')">+' + formatM(o.mensuel) + '</button>' +
+            (calc.done ? '' : '<div class="deja-adjust-full">' +
+                '<div class="deja-quick-buttons">' +
+                    '<button class="deja-quick-btn" onclick="updateObjectifDeja(' + o.id + ',10)">+10€</button>' +
+                    '<button class="deja-quick-btn" onclick="updateObjectifDeja(' + o.id + ',50)">+50€</button>' +
+                    '<button class="deja-quick-btn" onclick="updateObjectifDeja(' + o.id + ',100)">+100€</button>' +
+                    '<button class="deja-quick-btn primary" onclick="updateObjectifDeja(' + o.id + ',' + o.mensuel + ')">+' + formatM(o.mensuel) + '</button>' +
+                '</div>' +
+                '<div class="deja-custom">' +
+                    '<input type="number" id="dejaCustom' + o.id + '" placeholder="Montant..." step="0.01" min="0" inputmode="decimal">' +
+                    '<button class="deja-add-btn" onclick="addCustomAmount(' + o.id + ')">+ Ajouter</button>' +
+                    '<button class="deja-sub-btn" onclick="subCustomAmount(' + o.id + ')">− Retirer</button>' +
+                '</div>' +
             '</div>') +
         '</div>';
     }).join('');
@@ -1433,7 +1460,6 @@ function renderResume() {
         }).join('');
     }
 
-    // Bouton report solde
     var btnReport = document.getElementById('btnReportSolde');
     var btnText = document.getElementById('btnReportText');
     var reportHint = document.getElementById('reportHint');
