@@ -8,18 +8,18 @@
     <meta name="apple-mobile-web-app-title" content="MonBudget">
     <meta name="theme-color" content="#0f0a1e">
     <meta name="mobile-web-app-capable" content="yes">
-   <link rel="manifest" href="manifest.json">
+    <link rel="manifest" href="manifest.json">
 
-<!-- Favicon (onglet du navigateur) -->
-<link rel="icon" type="image/x-icon" href="favicon.ico">
-<link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
-<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
 
-<!-- Icône iOS (écran d'accueil iPhone) -->
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
-<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+    <!-- Icône iOS -->
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 
-<title>💰 MonBudget</title>
+    <title>💰 MonBudget</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -30,7 +30,6 @@
             <div class="auth-logo">💰</div>
             <h1 class="auth-title">MonBudget</h1>
             <p class="auth-subtitle">Gérez vos finances simplement</p>
-            
 
             <div class="auth-form" id="loginForm">
                 <div class="auth-field">
@@ -252,37 +251,37 @@
                         <div><strong>Salaire décalé</strong><small>Les heures faites ce mois seront payées le mois suivant</small></div>
                     </div>
                     <div class="prevision-card">
-    <div class="prevision-header">
-        <span class="prevision-icon">🔮</span>
-        <div><strong>Prévision de paie</strong><small>Basé sur vos heures</small></div>
-    </div>
-    <div class="prevision-row">
-        <div class="prevision-item"><span>Ce mois-ci</span><strong id="previsionActuel">0,00 €</strong><small id="previsionActuelSub">Sera reçu le mois prochain</small></div>
-        <div class="prevision-sep"></div>
-        <div class="prevision-item"><span>Mois précédent</span><strong id="previsionPrecedent">0,00 €</strong><small id="previsionPrecedentSub">À recevoir ce mois</small></div>
-    </div>
+                        <div class="prevision-header">
+                            <span class="prevision-icon">🔮</span>
+                            <div><strong>Prévision de paie</strong><small>Basé sur vos heures</small></div>
+                        </div>
+                        <div class="prevision-row">
+                            <div class="prevision-item"><span>Ce mois-ci</span><strong id="previsionActuel">0,00 €</strong><small id="previsionActuelSub">Sera reçu le mois prochain</small></div>
+                            <div class="prevision-sep"></div>
+                            <div class="prevision-item"><span>Mois précédent</span><strong id="previsionPrecedent">0,00 €</strong><small id="previsionPrecedentSub">À recevoir ce mois</small></div>
+                        </div>
 
-    <div class="paie-ajustement" id="paieAjustement">
-        <label class="ajustement-label">💶 Montant réel à enregistrer</label>
-        <div class="input-stepper">
-            <button type="button" class="stepper-btn" id="paieMinus">−</button>
-            <input type="number" id="montantPaieAjuste" step="0.01" min="0" value="0" inputmode="decimal">
-            <button type="button" class="stepper-btn" id="paiePlus">+</button>
-        </div>
-        <div class="ajustement-hint">
-            <span id="diffHint">Ajustez selon votre bulletin de paie</span>
-        </div>
-        <div class="quick-adjust">
-    <button type="button" class="quick-adjust-btn" data-adj="reset">🔄</button>
-    <button type="button" class="quick-adjust-btn" data-adj="-5">-5%</button>
-    <button type="button" class="quick-adjust-btn" data-adj="-10">-10%</button>
-    <button type="button" class="quick-adjust-btn" data-adj="-15">-15%</button>
-    <button type="button" class="quick-adjust-btn" data-adj="-20">-20%</button>
-</div>
-    </div>
+                        <div class="paie-ajustement" id="paieAjustement">
+                            <label class="ajustement-label">💶 Montant réel à enregistrer</label>
+                            <div class="input-stepper">
+                                <button type="button" class="stepper-btn" id="paieMinus">−</button>
+                                <input type="number" id="montantPaieAjuste" step="0.01" min="0" value="0" inputmode="decimal">
+                                <button type="button" class="stepper-btn" id="paiePlus">+</button>
+                            </div>
+                            <div class="ajustement-hint">
+                                <span id="diffHint">Ajustez selon votre bulletin de paie</span>
+                            </div>
+                            <div class="quick-adjust">
+                                <button type="button" class="quick-adjust-btn" data-adj="reset">🔄</button>
+                                <button type="button" class="quick-adjust-btn" data-adj="-5">-5%</button>
+                                <button type="button" class="quick-adjust-btn" data-adj="-10">-10%</button>
+                                <button type="button" class="quick-adjust-btn" data-adj="-15">-15%</button>
+                                <button type="button" class="quick-adjust-btn" data-adj="-20">-20%</button>
+                            </div>
+                        </div>
 
-    <button class="submit-btn purple" id="btnQuickPaie">✨ Enregistrer cette paie</button>
-</div>
+                        <button class="submit-btn purple" id="btnQuickPaie">✨ Enregistrer cette paie</button>
+                    </div>
                     <div class="form-card collapsed" id="formCardP">
                         <form id="formPaiement">
                             <div class="form-field"><label>📅 Mois de réception</label><input type="month" id="moisPaiement" required></div>
@@ -345,159 +344,219 @@
             </section>
 
             <!-- TAB: DEPENSES / BUDGET -->
-<section class="tab-section" id="tab-depenses">
-    <div class="section-title"><h2>💳 Mon Budget</h2></div>
-    <div class="sub-tabs">
-        <button class="sub-tab active" data-subtab="depenses-list" onclick="switchBudgetTab('depenses-list')">💳 Dépenses</button>
-        <button class="sub-tab" data-subtab="shopping-list" onclick="switchBudgetTab('shopping-list')">🛒 À acheter</button>
-    </div>
-
-    <!-- Sub: Dépenses -->
-    <div class="sub-tab-content active" id="subtab-depenses-list">
-    <div class="section-title" style="margin-top:6px">
-        <h3 style="font-size:1rem">💳 Mes Dépenses</h3>
-        <button class="pill-btn red" id="btnToggleFormD">+ Ajouter</button>
-    </div>
-                <div class="form-card collapsed" id="formCardD">
-                    <form id="formDepense">
-                        <div class="form-row-2">
-                            <div class="form-field"><label>📅 Date</label><input type="date" id="dateDepense" required></div>
-                            <div class="form-field"><label>💶 Montant</label><input type="number" id="montantDepense" step="0.01" min="0.01" placeholder="0,00" inputmode="decimal" required></div>
-                        </div>
-                        <div class="form-field">
-                            <label>🏷️ Catégorie</label>
-                            <div class="cat-grid" id="catGrid"></div>
-                            <input type="hidden" id="categorieDepense" required>
-                        </div>
-                        <div class="form-field"><label>📝 Description</label><input type="text" id="descriptionDepense" placeholder="Ex: Courses Carrefour"></div>
-                        <button type="submit" class="submit-btn red">✅ Enregistrer</button>
-                    </form>
+            <section class="tab-section" id="tab-depenses">
+                <div class="section-title"><h2>💳 Mon Budget</h2></div>
+                <div class="sub-tabs">
+                    <button class="sub-tab active" data-subtab="depenses-list" onclick="switchBudgetTab('depenses-list')">💳 Dépenses</button>
+                    <button class="sub-tab" data-subtab="shopping-list" onclick="switchBudgetTab('shopping-list')">🛒 À acheter</button>
                 </div>
-                <div class="month-filter">
-                    <button class="arrow-btn" id="prevD">‹</button>
-                    <input type="month" id="filtreDepenseMois" class="month-input">
-                    <button class="arrow-btn" id="nextD">›</button>
-                </div>
-                <div class="quick-stats">
-                    <div class="qs-item"><span id="qsNbD">0</span><small>Dépenses</small></div>
-                    <div class="qs-item"><span id="qsMoyD">0 €</span><small>Moyenne</small></div>
-                    <div class="qs-item"><span id="qsMaxD">0 €</span><small>Max</small></div>
-                </div>
-                <div class="cat-summary" id="catSummary"></div>
-                   <div class="list-wrapper" id="listeDepenses"><p class="empty-state">🎉 Aucune dépense !</p></div>
-    </div>
 
-    <!-- Sub: Shopping List -->
-    <div class="sub-tab-content" id="subtab-shopping-list">
-        <div class="section-title" style="margin-top:6px">
-            <h3 style="font-size:1rem">🛒 Liste d'achats</h3>
-            <button class="pill-btn" id="btnToggleFormShop">+ Ajouter</button>
-        </div>
-
-        <div class="info-banner">
-            <span class="info-icon">💡</span>
-            <div><strong>Planifiez vos achats</strong><small>Ajoutez ce que vous devez acheter et le prix estimé</small></div>
-        </div>
-
-        <div class="form-card collapsed" id="formCardShop">
-            <form id="formShop">
-                <div class="form-row-2">
-                    <div class="form-field">
-                        <label>🛒 Article</label>
-                        <input type="text" id="nomShop" placeholder="Ex: Chaussures Nike" required>
+                <!-- Sub: Dépenses -->
+                <div class="sub-tab-content active" id="subtab-depenses-list">
+                    <div class="section-title" style="margin-top:6px">
+                        <h3 style="font-size:1rem">💳 Mes Dépenses</h3>
+                        <button class="pill-btn red" id="btnToggleFormD">+ Ajouter</button>
                     </div>
-                    <div class="form-field">
-                        <label>💶 Prix estimé (€)</label>
-                        <input type="number" id="prixShop" step="0.01" min="0" placeholder="0,00" inputmode="decimal">
+                    <div class="form-card collapsed" id="formCardD">
+                        <form id="formDepense">
+                            <div class="form-row-2">
+                                <div class="form-field"><label>📅 Date</label><input type="date" id="dateDepense" required></div>
+                                <div class="form-field"><label>💶 Montant</label><input type="number" id="montantDepense" step="0.01" min="0.01" placeholder="0,00" inputmode="decimal" required></div>
+                            </div>
+                            <div class="form-field">
+                                <label>🏷️ Catégorie</label>
+                                <div class="cat-grid" id="catGrid"></div>
+                                <input type="hidden" id="categorieDepense" required>
+                            </div>
+                            <div class="form-field"><label>📝 Description</label><input type="text" id="descriptionDepense" placeholder="Ex: Courses Carrefour"></div>
+                            <button type="submit" class="submit-btn red">✅ Enregistrer</button>
+                        </form>
+                    </div>
+                    <div class="month-filter">
+                        <button class="arrow-btn" id="prevD">‹</button>
+                        <input type="month" id="filtreDepenseMois" class="month-input">
+                        <button class="arrow-btn" id="nextD">›</button>
+                    </div>
+                    <div class="quick-stats">
+                        <div class="qs-item"><span id="qsNbD">0</span><small>Dépenses</small></div>
+                        <div class="qs-item"><span id="qsMoyD">0 €</span><small>Moyenne</small></div>
+                        <div class="qs-item"><span id="qsMaxD">0 €</span><small>Max</small></div>
+                    </div>
+                    <div class="cat-summary" id="catSummary"></div>
+                    <div class="list-wrapper" id="listeDepenses"><p class="empty-state">🎉 Aucune dépense !</p></div>
+                </div>
+
+                <!-- Sub: Shopping List -->
+                <div class="sub-tab-content" id="subtab-shopping-list">
+                    <div class="section-title" style="margin-top:6px">
+                        <h3 style="font-size:1rem">🛒 Liste d'achats</h3>
+                        <button class="pill-btn" id="btnToggleFormShop">+ Ajouter</button>
+                    </div>
+                    <div class="info-banner">
+                        <span class="info-icon">💡</span>
+                        <div><strong>Planifiez vos achats</strong><small>Ajoutez ce que vous devez acheter et le prix estimé</small></div>
+                    </div>
+                    <div class="form-card collapsed" id="formCardShop">
+                        <form id="formShop">
+                            <div class="form-row-2">
+                                <div class="form-field"><label>🛒 Article</label><input type="text" id="nomShop" placeholder="Ex: Chaussures" required></div>
+                                <div class="form-field"><label>💶 Prix estimé</label><input type="number" id="prixShop" step="0.01" min="0" placeholder="0,00" inputmode="decimal"></div>
+                            </div>
+                            <div class="form-field">
+                                <label>🏷️ Priorité</label>
+                                <div class="prio-grid">
+                                    <button type="button" class="prio-btn active" data-prio="normal" onclick="selectPrio(this,'normal')">📦 Normal</button>
+                                    <button type="button" class="prio-btn" data-prio="urgent" onclick="selectPrio(this,'urgent')">🔴 Urgent</button>
+                                    <button type="button" class="prio-btn" data-prio="envie" onclick="selectPrio(this,'envie')">💫 Envie</button>
+                                </div>
+                            </div>
+                            <div class="form-field"><label>📝 Note</label><input type="text" id="noteShop" placeholder="Optionnel..."></div>
+                            <button type="submit" class="submit-btn purple">✅ Ajouter à la liste</button>
+                        </form>
+                    </div>
+                    <div class="shop-summary" id="shopSummary"></div>
+                    <div class="list-wrapper" id="listeShop">
+                        <p class="empty-state">🛒 Liste vide.<br><small>Ajoutez ce que vous souhaitez acheter.</small></p>
                     </div>
                 </div>
-                <div class="form-field">
-                    <label>🏷️ Priorité</label>
-                    <div class="prio-grid">
-                        <button type="button" class="prio-btn active" data-prio="normal" onclick="selectPrio(this,'normal')">📦 Normal</button>
-                        <button type="button" class="prio-btn" data-prio="urgent" onclick="selectPrio(this,'urgent')">🔴 Urgent</button>
-                        <button type="button" class="prio-btn" data-prio="envie" onclick="selectPrio(this,'envie')">💫 Envie</button>
-                    </div>
-                </div>
-                <div class="form-field">
-                    <label>📝 Note</label>
-                    <input type="text" id="noteShop" placeholder="Optionnel...">
-                </div>
-                <button type="submit" class="submit-btn purple">✅ Ajouter à la liste</button>
-            </form>
-        </div>
-
-        <div class="shop-summary" id="shopSummary"></div>
-
-        <div class="list-wrapper" id="listeShop">
-            <p class="empty-state">🛒 Liste vide.<br><small>Ajoutez ce que vous souhaitez acheter.</small></p>
-        </div>
-    </div>
-</section>
+            </section>
 
             <!-- TAB: EPARGNE -->
-<section class="tab-section" id="tab-epargne">
-    <div class="section-title"><h2>🏦 Mon Épargne</h2></div>
+            <section class="tab-section" id="tab-epargne">
+                <div class="section-title"><h2>🏦 Mon Épargne</h2></div>
 
-    <!-- Solde épargne -->
-    <div class="epargne-solde-card">
-        <div class="epargne-solde-header">
-            <span class="epargne-icon">🏦</span>
-            <div>
-                <strong>Solde épargne</strong>
-                <small>Total mis de côté</small>
-            </div>
-        </div>
-        <div class="epargne-montant" id="epargneSolde">0,00 €</div>
-    </div>
+                <div class="epargne-solde-card">
+                    <div class="epargne-solde-header">
+                        <span class="epargne-icon">🏦</span>
+                        <div>
+                            <strong>Solde épargne</strong>
+                            <small>Total mis de côté</small>
+                        </div>
+                    </div>
+                    <div class="epargne-montant" id="epargneSolde">0,00 €</div>
+                </div>
 
-    <!-- Actions -->
-    <div class="epargne-actions">
-        <button class="epargne-action-btn deposit" id="btnEpargneDeposit">
-            <span class="ea-icon">📥</span>
-            <span class="ea-text">Épargner</span>
-        </button>
-        <button class="epargne-action-btn withdraw" id="btnEpargneWithdraw">
-            <span class="ea-icon">📤</span>
-            <span class="ea-text">Retirer</span>
-        </button>
-    </div>
+                <div class="epargne-actions">
+                    <button class="epargne-action-btn deposit" id="btnEpargneDeposit">
+                        <span class="ea-icon">📥</span>
+                        <span class="ea-text">Épargner</span>
+                    </button>
+                    <button class="epargne-action-btn withdraw" id="btnEpargneWithdraw">
+                        <span class="ea-icon">📤</span>
+                        <span class="ea-text">Retirer</span>
+                    </button>
+                </div>
 
-    <!-- Form Épargne -->
-    <div class="form-card collapsed" id="formCardEpargne">
-        <form id="formEpargne">
-            <div class="form-field">
-                <label id="epargneFormLabel">💶 Montant à épargner (€)</label>
-                <input type="number" id="montantEpargne" step="0.01" min="0.01" placeholder="0,00" inputmode="decimal" required>
-            </div>
-            <div class="form-field">
-                <label>📝 Raison</label>
-                <input type="text" id="raisonEpargne" placeholder="Ex: Vacances, sécurité...">
-            </div>
-            <button type="submit" class="submit-btn green" id="btnSubmitEpargne">📥 Épargner</button>
-        </form>
-    </div>
+                <div class="form-card collapsed" id="formCardEpargne">
+                    <form id="formEpargne">
+                        <div class="form-field">
+                            <label id="epargneFormLabel">💶 Montant à épargner (€)</label>
+                            <input type="number" id="montantEpargne" step="0.01" min="0.01" placeholder="0,00" inputmode="decimal" required>
+                        </div>
+                        <div class="form-field">
+                            <label>📝 Raison</label>
+                            <input type="text" id="raisonEpargne" placeholder="Ex: Vacances, sécurité...">
+                        </div>
+                        <button type="submit" class="submit-btn green" id="btnSubmitEpargne">📥 Épargner</button>
+                    </form>
+                </div>
 
-    <!-- Filtre -->
-    <div class="month-filter">
-        <button class="arrow-btn" id="prevEpargne">‹</button>
-        <input type="month" id="filtreEpargneMois" class="month-input">
-        <button class="arrow-btn" id="nextEpargne">›</button>
-    </div>
+                <div class="month-filter">
+                    <button class="arrow-btn" id="prevEpargne">‹</button>
+                    <input type="month" id="filtreEpargneMois" class="month-input">
+                    <button class="arrow-btn" id="nextEpargne">›</button>
+                </div>
 
-    <!-- Stats -->
-    <div class="quick-stats">
-        <div class="qs-item"><span id="qsNbEpargne">0</span><small>Mouvements</small></div>
-        <div class="qs-item"><span id="qsDepotEpargne">0 €</span><small>Déposé</small></div>
-        <div class="qs-item"><span id="qsRetraitEpargne">0 €</span><small>Retiré</small></div>
-    </div>
+                <div class="quick-stats">
+                    <div class="qs-item"><span id="qsNbEpargne">0</span><small>Mouvements</small></div>
+                    <div class="qs-item"><span id="qsDepotEpargne">0 €</span><small>Déposé</small></div>
+                    <div class="qs-item"><span id="qsRetraitEpargne">0 €</span><small>Retiré</small></div>
+                </div>
 
-    <!-- Liste -->
-    <div class="list-wrapper" id="listeEpargne">
-        <p class="empty-state">🏦 Aucun mouvement d'épargne.</p>
-    </div>
-</section>
-            
+                <div class="list-wrapper" id="listeEpargne">
+                    <p class="empty-state">🏦 Aucun mouvement d'épargne.</p>
+                </div>
+            </section>
+
+            <!-- TAB: OBJECTIFS -->
+            <section class="tab-section" id="tab-objectifs">
+                <div class="section-title">
+                    <h2>🎯 Mes Objectifs</h2>
+                    <button class="pill-btn" id="btnToggleFormObj">+ Ajouter</button>
+                </div>
+
+                <div class="calc-card">
+                    <div class="calc-header">
+                        <span class="calc-icon">🧮</span>
+                        <div><strong>Calculateur rapide</strong><small>Simulez sans enregistrer</small></div>
+                    </div>
+                    <div class="calc-fields">
+                        <div class="form-field">
+                            <label>🎯 Montant à atteindre (€)</label>
+                            <input type="number" id="calcObjectif" step="10" min="0" placeholder="Ex: 3000" inputmode="decimal">
+                        </div>
+                        <div class="form-field">
+                            <label>💰 J'épargne par mois (€)</label>
+                            <input type="number" id="calcMensuel" step="10" min="0" placeholder="Ex: 150" inputmode="decimal">
+                        </div>
+                        <div class="form-field">
+                            <label>💶 J'ai déjà (€)</label>
+                            <input type="number" id="calcDeja" step="10" min="0" value="0" inputmode="decimal">
+                        </div>
+                    </div>
+                    <div class="calc-result" id="calcResult">
+                        <span class="calc-result-icon">⏱️</span>
+                        <div class="calc-result-text" id="calcResultText">Entrez les valeurs...</div>
+                    </div>
+                </div>
+
+                <div class="form-card collapsed" id="formCardObj">
+                    <form id="formObjectif">
+                        <div class="form-field">
+                            <label>🎯 Nom de l'objectif</label>
+                            <input type="text" id="nomObjectif" placeholder="Ex: Vacances au Japon" required>
+                        </div>
+                        <div class="form-row-2">
+                            <div class="form-field">
+                                <label>💶 Montant total (€)</label>
+                                <input type="number" id="montantObjectif" step="10" min="1" placeholder="0,00" inputmode="decimal" required>
+                            </div>
+                            <div class="form-field">
+                                <label>💰 Épargne/mois (€)</label>
+                                <input type="number" id="mensuelObjectif" step="10" min="1" placeholder="0,00" inputmode="decimal" required>
+                            </div>
+                        </div>
+                        <div class="form-field">
+                            <label>💵 Déjà mis de côté (€)</label>
+                            <input type="number" id="dejaObjectif" step="10" min="0" value="0" inputmode="decimal">
+                        </div>
+                        <div class="form-field">
+                            <label>🎨 Emoji</label>
+                            <div class="emoji-grid">
+                                <button type="button" class="emoji-chip active" data-emoji="🎯" onclick="selectEmoji(this,'🎯')">🎯</button>
+                                <button type="button" class="emoji-chip" data-emoji="🏖️" onclick="selectEmoji(this,'🏖️')">🏖️</button>
+                                <button type="button" class="emoji-chip" data-emoji="🚗" onclick="selectEmoji(this,'🚗')">🚗</button>
+                                <button type="button" class="emoji-chip" data-emoji="🏠" onclick="selectEmoji(this,'🏠')">🏠</button>
+                                <button type="button" class="emoji-chip" data-emoji="💻" onclick="selectEmoji(this,'💻')">💻</button>
+                                <button type="button" class="emoji-chip" data-emoji="📱" onclick="selectEmoji(this,'📱')">📱</button>
+                                <button type="button" class="emoji-chip" data-emoji="🎮" onclick="selectEmoji(this,'🎮')">🎮</button>
+                                <button type="button" class="emoji-chip" data-emoji="👕" onclick="selectEmoji(this,'👕')">👕</button>
+                                <button type="button" class="emoji-chip" data-emoji="💍" onclick="selectEmoji(this,'💍')">💍</button>
+                                <button type="button" class="emoji-chip" data-emoji="🎓" onclick="selectEmoji(this,'🎓')">🎓</button>
+                                <button type="button" class="emoji-chip" data-emoji="✈️" onclick="selectEmoji(this,'✈️')">✈️</button>
+                                <button type="button" class="emoji-chip" data-emoji="🎁" onclick="selectEmoji(this,'🎁')">🎁</button>
+                            </div>
+                            <input type="hidden" id="emojiObjectif" value="🎯">
+                        </div>
+                        <button type="submit" class="submit-btn purple">✅ Créer l'objectif</button>
+                    </form>
+                </div>
+
+                <div class="list-wrapper" id="listeObjectifs">
+                    <p class="empty-state">🎯 Aucun objectif défini.<br><small>Créez-en un pour planifier vos économies !</small></p>
+                </div>
+            </section>
+
             <!-- TAB: RESUME -->
             <section class="tab-section" id="tab-resume">
                 <div class="section-title"><h2>📈 Résumé</h2></div>
@@ -517,16 +576,16 @@
                         <div class="progress-bar-green" id="progressGreen"></div>
                         <div class="progress-bar-red" id="progressRed"></div>
                     </div>
-                       <div class="bilan-solde"><span>Il vous reste</span><strong id="bilanSolde">0,00 €</strong></div>
-    <p class="bilan-percent" id="bilanPercent">—</p>
+                    <div class="bilan-solde"><span>Il vous reste</span><strong id="bilanSolde">0,00 €</strong></div>
+                    <p class="bilan-percent" id="bilanPercent">—</p>
 
-    <div class="report-section" id="reportSection">
-        <button class="submit-btn purple" id="btnReportSolde" style="display:none">
-            <span id="btnReportText">📅 Reporter au mois suivant</span>
-        </button>
-        <p class="report-hint" id="reportHint"></p>
-    </div>
-</div>
+                    <div class="report-section" id="reportSection">
+                        <button class="submit-btn purple" id="btnReportSolde" style="display:none">
+                            <span id="btnReportText">📅 Reporter au mois suivant</span>
+                        </button>
+                        <p class="report-hint" id="reportHint"></p>
+                    </div>
+                </div>
                 <div class="stats-grid">
                     <div class="stat-card"><span class="stat-icon">📅</span><span class="stat-val" id="statJours">0</span><span class="stat-lbl">Jours</span></div>
                     <div class="stat-card"><span class="stat-icon">⏱️</span><span class="stat-val" id="statHeures">0h</span><span class="stat-lbl">Heures</span></div>
@@ -635,19 +694,20 @@
                     </div>
                 </div>
 
-                <div class="app-version">MonBudget v3.5</div>
+                <div class="app-version">MonBudget v4.0</div>
             </section>
 
         </main>
 
         <nav class="bottom-nav">
-    <button class="nav-btn active" data-tab="horaires"><span class="nav-icon">⏰</span><span class="nav-label">Horaires</span></button>
-    <button class="nav-btn" data-tab="paiements"><span class="nav-icon">💰</span><span class="nav-label">Revenus</span></button>
-    <button class="nav-btn" data-tab="depenses"><span class="nav-icon">💳</span><span class="nav-label">Budget</span></button>
-    <button class="nav-btn" data-tab="epargne"><span class="nav-icon">🏦</span><span class="nav-label">Épargne</span></button>
-    <button class="nav-btn" data-tab="resume"><span class="nav-icon">📈</span><span class="nav-label">Résumé</span></button>
-    <button class="nav-btn" data-tab="settings"><span class="nav-icon">⚙️</span><span class="nav-label">Réglages</span></button>
-</nav>
+            <button class="nav-btn active" data-tab="horaires"><span class="nav-icon">⏰</span><span class="nav-label">Horaires</span></button>
+            <button class="nav-btn" data-tab="paiements"><span class="nav-icon">💰</span><span class="nav-label">Revenus</span></button>
+            <button class="nav-btn" data-tab="depenses"><span class="nav-icon">💳</span><span class="nav-label">Budget</span></button>
+            <button class="nav-btn" data-tab="epargne"><span class="nav-icon">🏦</span><span class="nav-label">Épargne</span></button>
+            <button class="nav-btn" data-tab="objectifs"><span class="nav-icon">🎯</span><span class="nav-label">Objectifs</span></button>
+            <button class="nav-btn" data-tab="resume"><span class="nav-icon">📈</span><span class="nav-label">Résumé</span></button>
+            <button class="nav-btn" data-tab="settings"><span class="nav-icon">⚙️</span><span class="nav-label">Réglages</span></button>
+        </nav>
     </div>
 
     <!-- PIN Modal -->
