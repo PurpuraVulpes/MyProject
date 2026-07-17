@@ -687,23 +687,9 @@ body {
     margin-bottom: 10px;
 }
 
-.paie-ajustement .input-stepper {
-    width: 100%;
-    box-sizing: border-box;
-}
-
-.paie-ajustement .input-stepper input {
-    min-width: 0;
-    width: 100%;
-    font-size: 1.1rem;
-}
-
-.paie-ajustement .stepper-btn {
-    width: 42px;
-    height: 42px;
-    flex-shrink: 0;
-    font-size: 1.3rem;
-}
+.paie-ajustement .input-stepper { width: 100%; box-sizing: border-box; }
+.paie-ajustement .input-stepper input { min-width: 0; width: 100%; font-size: 1.1rem; }
+.paie-ajustement .stepper-btn { width: 42px; height: 42px; flex-shrink: 0; font-size: 1.3rem; }
 
 .ajustement-hint {
     text-align: center;
@@ -1176,29 +1162,80 @@ body {
     font-weight: 700;
 }
 
-.deja-adjust {
+/* DEJA ADJUST FULL - Boutons rapides objectifs */
+.deja-adjust-full {
+    margin-top: 12px;
     display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-top: 10px;
+    flex-direction: column;
+    gap: 10px;
 }
 
-.deja-adjust-btn {
-    flex: 1;
-    padding: 8px;
+.deja-quick-buttons {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+}
+
+.deja-quick-btn {
+    padding: 10px 4px;
     border: 1.5px solid var(--border);
     border-radius: 8px;
     background: var(--card);
     color: var(--text2);
-    font-size: 0.78rem;
+    font-size: 0.75rem;
     font-weight: 600;
     cursor: pointer;
     font-family: inherit;
     -webkit-tap-highlight-color: transparent;
     transition: all 0.15s;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.deja-adjust-btn:active { background: var(--primary); color: white; }
+.deja-quick-btn:active { background: var(--green); color: white; transform: scale(0.95); }
+.deja-quick-btn.primary { border-color: var(--primary); color: var(--primary-light); background: var(--purple-glow); }
+.deja-quick-btn.primary:active { background: var(--primary); color: white; }
+
+.deja-custom {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 6px;
+    align-items: center;
+}
+
+.deja-custom input {
+    padding: 10px 12px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg3);
+    color: var(--text);
+    font-size: 0.9rem;
+    font-family: inherit;
+    -webkit-appearance: none;
+    min-width: 0;
+    width: 100%;
+}
+
+.deja-custom input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-glow); }
+
+.deja-add-btn, .deja-sub-btn {
+    padding: 10px 12px;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    -webkit-tap-highlight-color: transparent;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+
+.deja-add-btn { background: var(--green); color: white; }
+.deja-add-btn:active { background: #00a876; transform: scale(0.95); }
+.deja-sub-btn { background: var(--red); color: white; }
+.deja-sub-btn:active { background: #c0392b; transform: scale(0.95); }
 
 /* SETTINGS */
 .settings-card {
