@@ -491,18 +491,18 @@
                         <div><strong>Calculateur rapide</strong><small>Simulez sans enregistrer</small></div>
                     </div>
                     <div class="calc-fields">
-                        <div class="form-field">
-                            <label>🎯 Montant à atteindre (€)</label>
-                            <input type="number" id="calcObjectif" step="10" min="0" placeholder="Ex: 3000" inputmode="decimal">
-                        </div>
-                        <div class="form-field">
-                            <label>💰 J'épargne par mois (€)</label>
-                            <input type="number" id="calcMensuel" step="10" min="0" placeholder="Ex: 150" inputmode="decimal">
-                        </div>
-                        <div class="form-field">
-                            <label>💶 J'ai déjà (€)</label>
-                            <input type="number" id="calcDeja" step="10" min="0" value="0" inputmode="decimal">
-                        </div>
+                       <div class="form-field">
+    <label>🎯 Montant à atteindre (€)</label>
+    <input type="number" id="calcObjectif" step="0.01" min="0" placeholder="Ex: 3000" inputmode="decimal">
+</div>
+<div class="form-field">
+    <label>💰 J'épargne par mois (€)</label>
+    <input type="number" id="calcMensuel" step="0.01" min="0" placeholder="Ex: 150" inputmode="decimal">
+</div>
+<div class="form-field">
+    <label>💶 J'ai déjà (€)</label>
+    <input type="number" id="calcDeja" step="0.01" min="0" value="0" inputmode="decimal">
+</div>
                     </div>
                     <div class="calc-result" id="calcResult">
                         <span class="calc-result-icon">⏱️</span>
