@@ -1,5 +1,5 @@
 /* ============================================
-   APP.JS - Point d'entrée principal v5
+   APP.JS - Point d'entrée principal v5 (Lot 2)
    ============================================ */
 
 'use strict';
@@ -12,47 +12,100 @@ const App = {
     initialized: false,
 
     /**
-     * Démarrage de l'application
+     * ==========================================
+     * DÉMARRAGE
+     * ==========================================
      */
     async init() {
         console.log('🚀 Initialisation MonBudget v5...');
 
         try {
-            // 1. Charger les données locales + migration éventuelle
+            // 1. Charger les données locales + migration
             Storage.init();
 
             // 2. Appliquer le thème
             this.applyTheme(State.settings.theme || 'purple');
 
-            // 3. Initialiser le router / navigation
+            // 3. Initialiser Firebase (optionnel, silencieux si non config)
+            const firebaseOk = FirebaseService.init();
+
+            // 4. Initialiser le système d'auth
+            if (firebaseOk) {
+                Auth.init();
+            }
+
+            // 5. Initialiser le système PIN
+            PinLock.init();
+
+            // 6. Initialiser le router / navigation
             Router.init();
 
-            // 4. Initialiser les événements globaux
+            // 7. Événements globaux
             this.setupGlobalEvents();
 
-            // 5. Initialiser les raccourcis clavier utiles sur desktop
+            // 8. Raccourcis clavier desktop
             this.setupKeyboardShortcuts();
 
-            // 6. Mettre à jour l’interface selon les modules actifs
+            // 9. Appliquer visibilité des modules
             this.applyModulesVisibility();
 
-            // 7. Cacher le splash screen
-            this.hideSplash();
+            // 10. Décider quel écran afficher au démarrage
+            await this.decideStartScreen(firebaseOk);
 
             this.initialized = true;
-
             console.log('✅ MonBudget v5 initialisé');
 
-            Toast.success('Bienvenue sur MonBudget v5');
-
         } catch (error) {
-            console.error('❌ Erreur initialisation app:', error);
+            console.error('❌ Erreur initialisation:', error);
             this.showFatalError(error);
         }
     },
 
     /**
-     * Applique le thème choisi
+     * Décide quel écran afficher au démarrage
+     */
+    async decideStartScreen(firebaseAvailable) {
+        // Attendre un peu pour laisser Firebase vérifier l'auth
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Cas 1 : Firebase dispo + utilisateur connecté
+        if (firebaseAvailable && FirebaseService.auth && FirebaseService.auth.currentUser) {
+            State.user = {
+                uid: FirebaseService.auth.currentUser.uid,
+                email: FirebaseService.auth.currentUser.email
+            };
+            State.isGuestMode = false;
+            this.hideSplash();
+
+            // Vérifier PIN
+            if (Storage.hasPin()) {
+                PinLock.checkOnStart();
+            }
+            return;
+        }
+
+        // Cas 2 : Mode local déjà activé auparavant
+        if (State.isGuestMode || !firebaseAvailable) {
+            this.hideSplash();
+
+            // Vérifier PIN
+            if (Storage.hasPin()) {
+                PinLock.checkOnStart();
+            }
+            return;
+        }
+
+        // Cas 3 : Utilisateur pas connecté et Firebase dispo → écran auth
+        this.hideSplash();
+        setTimeout(() => {
+            Auth.showAuthScreen();
+        }, 300);
+    },
+
+    /**
+     * ==========================================
+     * THÈME
+     * ==========================================
      */
     applyTheme(theme) {
         document.documentElement.setAttribute('data-theme', theme);
@@ -67,20 +120,31 @@ const App = {
                 red: '#1a0a0e',
                 green: '#0a1a12'
             };
-
             metaTheme.setAttribute('content', colors[theme] || colors.purple);
         }
 
         State.settings.theme = theme;
-        Storage.saveSection('settings');
+        notifyStateChange();
 
-        document.dispatchEvent(new CustomEvent('theme:changed', {
-            detail: { theme }
-        }));
+        // Sync cloud si connecté
+        if (State.user && !State.isGuestMode) {
+            CloudSync.saveSettings();
+        }
+
+        document.dispatchEvent(new CustomEvent('theme:changed', { detail: { theme } }));
+
+        // Mettre à jour le label dans "Plus"
+        const themeLabel = document.getElementById('menuThemeLabel');
+        if (themeLabel) {
+            const themeInfo = THEMES_DISPONIBLES.find(t => t.id === theme);
+            themeLabel.textContent = themeInfo ? themeInfo.label : theme;
+        }
     },
 
     /**
-     * Cache l'écran de chargement
+     * ==========================================
+     * SPLASH SCREEN
+     * ==========================================
      */
     hideSplash() {
         const splash = document.getElementById('splashScreen');
@@ -92,10 +156,7 @@ const App = {
 
         requestAnimationFrame(() => {
             splash.classList.add('fade-out');
-
-            setTimeout(() => {
-                splash.hidden = true;
-            }, 450);
+            setTimeout(() => splash.hidden = true, 450);
         });
     },
 
@@ -104,9 +165,8 @@ const App = {
      */
     showFatalError(error) {
         const splash = document.getElementById('splashScreen');
-
         if (!splash) {
-            alert('Erreur au lancement : ' + error.message);
+            alert('Erreur : ' + error.message);
             return;
         }
 
@@ -116,162 +176,643 @@ const App = {
             <p style="color: var(--text2); text-align:center; max-width:300px; padding:0 20px;">
                 Impossible de lancer l'application.
             </p>
-            <pre style="
-                color: var(--danger);
-                background: var(--card);
-                padding: 12px;
-                border-radius: 12px;
-                max-width: 90vw;
-                overflow:auto;
-                font-size: 0.75rem;
-            ">${error.message}</pre>
-            <button onclick="location.reload()" style="
-                margin-top:16px;
-                padding:12px 20px;
-                background:var(--primary);
-                color:white;
-                border-radius:12px;
-                font-weight:700;
-            ">Recharger</button>
+            <pre style="color: var(--danger); background: var(--card); padding: 12px; border-radius: 12px; max-width: 90vw; overflow:auto; font-size: 0.75rem;">${error.message}</pre>
+            <button onclick="location.reload()" style="margin-top:16px; padding:12px 20px; background:var(--primary); color:white; border-radius:12px; font-weight:700;">Recharger</button>
         `;
     },
 
     /**
-     * Événements globaux
+     * ==========================================
+     * ÉVÉNEMENTS GLOBAUX
+     * ==========================================
      */
     setupGlobalEvents() {
-        // Quand une page change
+        // Page changée
         document.addEventListener('page:changed', (e) => {
             this.onPageChanged(e.detail.page, e.detail.previous);
         });
 
-        // Quand les données sont importées
-        document.addEventListener('data:imported', () => {
-            this.refreshUI();
+        // Auth
+        document.addEventListener('auth:signedin', () => {
+            this.onSignedIn();
         });
 
-        // Quand le thème change
-        document.addEventListener('theme:changed', (e) => {
-            console.log('🎨 Thème changé:', e.detail.theme);
+        document.addEventListener('auth:signedout', () => {
+            this.onSignedOut();
         });
 
-        // Quand l’état est sauvegardé
-        document.addEventListener('state:saved', (e) => {
-            console.log('💾 État sauvegardé:', e.detail.size + ' octets');
+        document.addEventListener('auth:guest', () => {
+            this.onGuestMode();
         });
 
-        // Gestion du retour navigateur
-        window.addEventListener('popstate', () => {
-            // Pour l’instant, on garde simple
-            // Plus tard : historique réel des pages
+        // Data
+        document.addEventListener('data:imported', () => this.refreshUI());
+        document.addEventListener('cloud:updated', () => this.refreshCurrentPage());
+
+        // Sync
+        document.addEventListener('state:saved', () => {
+            this.updateSyncStatus();
         });
 
-        // PWA install prompt
+        // Boutons du menu "Plus"
+        this.setupMoreMenuEvents();
+
+        // Boutons de compte
+        const btnSignOut = document.getElementById('btnSignOut');
+        if (btnSignOut) {
+            btnSignOut.addEventListener('click', () => Auth.handleSignOut());
+        }
+
+        const btnSyncManual = document.getElementById('btnSyncManual');
+        if (btnSyncManual) {
+            btnSyncManual.addEventListener('click', () => CloudSync.manualSync());
+        }
+
+        // Bouton lock (header)
+        const btnLock = document.getElementById('btnLock');
+        if (btnLock) {
+            btnLock.addEventListener('click', () => PinLock.showLockScreen());
+        }
+
+        // Visibilité (retour app)
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) this.onAppResume();
+        });
+
+        // Beforeinstallprompt (PWA)
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
             this.deferredInstallPrompt = e;
-            console.log('📲 Installation PWA disponible');
-        });
-
-        // Quand l'app revient au premier plan
-        document.addEventListener('visibilitychange', () => {
-            if (!document.hidden) {
-                this.onAppResume();
-            }
         });
     },
 
     /**
-     * Événements clavier desktop
+     * Configure les événements du menu "Plus"
      */
-    setupKeyboardShortcuts() {
-        document.addEventListener('keydown', (e) => {
-            // Éviter les raccourcis quand on tape dans un input
-            const tag = document.activeElement.tagName.toLowerCase();
-            if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
-
-            // Navigation avec touches 1-5
-            if (e.key >= '1' && e.key <= '5') {
-                const index = parseInt(e.key) - 1;
-                const page = Router.pages[index];
-                if (page) Router.navigateTo(page);
-            }
-
-            // A pour Ajouter
-            if (e.key.toLowerCase() === 'a') {
-                Router.navigateTo('add');
-            }
-
-            // Échap ferme une sheet
-            if (e.key === 'Escape') {
-                Router.closeSheet();
-            }
+    setupMoreMenuEvents() {
+        document.querySelectorAll('.menu-item[data-more]').forEach(item => {
+            item.addEventListener('click', () => {
+                const action = item.dataset.more;
+                this.handleMoreAction(action);
+            });
         });
     },
 
     /**
-     * Quand on change de page
+     * Gère les actions du menu "Plus"
      */
-    onPageChanged(page, previous) {
-        console.log(`📄 Page: ${previous || 'none'} → ${page}`);
-
-        // Rafraîchir selon la page
-        switch (page) {
-            case 'home':
-                this.renderHomePlaceholder();
+    handleMoreAction(action) {
+        switch (action) {
+            case 'account':
+                this.openAccountSheet();
                 break;
-
-            case 'add':
-                this.refreshAddMenu();
+            case 'theme':
+                this.openThemeSheet();
                 break;
-
-            case 'budget':
-                this.refreshBudgetPlaceholder();
+            case 'modules':
+                this.openModulesSheet();
                 break;
-
-            case 'analyse':
-                this.refreshAnalysePlaceholder();
+            case 'widgets':
+                Toast.info('🚧 Widgets personnalisables (Lot 3)');
                 break;
-
-            case 'more':
-                this.refreshMorePage();
+            case 'settings':
+                this.openSettingsSheet();
                 break;
+            case 'pin':
+                this.openPinManageSheet();
+                break;
+            case 'export':
+                this.handleExport();
+                break;
+            case 'import':
+                this.handleImport();
+                break;
+            case 'reset':
+                this.confirmReset();
+                break;
+            case 'epargne':
+            case 'objectifs':
+            case 'horaires':
+            case 'calendrier':
+                Toast.info('🚧 Disponible dans le Lot 3');
+                break;
+            default:
+                console.log('Action inconnue:', action);
         }
     },
 
     /**
-     * Quand l'app revient au premier plan
+     * ==========================================
+     * SHEETS D'ACTIONS
+     * ==========================================
      */
-    onAppResume() {
-        console.log('🔄 App reprise');
 
-        // Plus tard : vérifier sync Firebase, notifications, dépenses récurrentes...
+    /**
+     * Ouvre la sheet du compte
+     */
+    openAccountSheet() {
+        let content;
+
+        if (State.user) {
+            // Connecté
+            content = `
+                <div class="banner banner-success" style="margin-bottom: var(--space-md);">
+                    <span class="banner-icon">☁️</span>
+                    <div class="banner-body">
+                        <div class="banner-title">Connecté</div>
+                        <div class="banner-text">${State.user.email}</div>
+                    </div>
+                </div>
+                <div class="form">
+                    <button class="btn btn-outline btn-block" onclick="CloudSync.manualSync()">
+                        🔄 Synchroniser maintenant
+                    </button>
+                    <button class="btn btn-outline btn-block" style="color: var(--danger); border-color: rgba(255,107,107,0.3);" onclick="Auth.handleSignOut()">
+                        🚪 Se déconnecter
+                    </button>
+                </div>
+            `;
+        } else if (State.isGuestMode) {
+            // Mode local
+            content = `
+                <div class="banner" style="margin-bottom: var(--space-md);">
+                    <span class="banner-icon">👤</span>
+                    <div class="banner-body">
+                        <div class="banner-title">Mode local</div>
+                        <div class="banner-text">Vos données restent sur cet appareil</div>
+                    </div>
+                </div>
+                <p style="color: var(--text2); font-size: var(--text-sm); text-align: center; margin-bottom: var(--space-md);">
+                    Créez un compte pour synchroniser vos données entre plusieurs appareils.
+                </p>
+                <button class="btn btn-primary btn-block" onclick="Router.closeSheet(); Auth.showAuthScreen();">
+                    🔗 Créer un compte / Se connecter
+                </button>
+            `;
+        } else {
+            // Firebase indisponible
+            content = `
+                <div class="banner banner-warning" style="margin-bottom: var(--space-md);">
+                    <span class="banner-icon">⚠️</span>
+                    <div class="banner-body">
+                        <div class="banner-title">Cloud non disponible</div>
+                        <div class="banner-text">Firebase n'est pas configuré</div>
+                    </div>
+                </div>
+                <p style="color: var(--text3); font-size: var(--text-xs); text-align: center;">
+                    Éditez <code>js/firebase.js</code> pour configurer votre projet Firebase.
+                </p>
+            `;
+        }
+
+        Router.openSheet('account', 'Mon compte', content);
     },
 
     /**
-     * Rafraîchissement global UI
+     * Ouvre la sheet du thème
      */
+    openThemeSheet() {
+        const currentTheme = State.settings.theme || 'purple';
+        let html = '<div class="theme-grid">';
+
+        THEMES_DISPONIBLES.forEach(t => {
+            const isActive = t.id === currentTheme;
+            html += `
+                <button class="theme-option ${isActive ? 'active' : ''}" data-theme="${t.id}">
+                    <div class="theme-preview theme-preview-${t.id}">
+                        <span></span><span></span><span></span>
+                    </div>
+                    <span class="theme-option-label">${t.label}</span>
+                </button>
+            `;
+        });
+
+        html += '</div>';
+
+        Router.openSheet('theme', 'Choisir un thème', html);
+
+        // Attacher les événements
+        setTimeout(() => {
+            document.querySelectorAll('.theme-option').forEach(opt => {
+                opt.addEventListener('click', () => {
+                    const theme = opt.dataset.theme;
+                    this.applyTheme(theme);
+                    Router.closeSheet();
+                    Toast.success('🎨 Thème appliqué !');
+                });
+            });
+        }, 100);
+    },
+
+    /**
+     * Ouvre la sheet des modules
+     */
+    openModulesSheet() {
+        const modules = [
+            { key: 'horaires', label: 'Horaires', icon: '⏰', desc: 'Suivi des heures de travail' },
+            { key: 'revenus', label: 'Revenus', icon: '💰', desc: 'Salaires et revenus supplémentaires' },
+            { key: 'depenses', label: 'Dépenses', icon: '💳', desc: 'Suivi des dépenses' },
+            { key: 'epargne', label: 'Épargne', icon: '🏦', desc: 'Dépôts et retraits' },
+            { key: 'objectifs', label: 'Objectifs', icon: '🎯', desc: 'Objectifs d\'épargne' },
+            { key: 'shopping', label: 'Liste d\'achats', icon: '🛒', desc: 'Choses à acheter' },
+            { key: 'recurrent', label: 'Dépenses récurrentes', icon: '🔁', desc: 'Loyer, abonnements...' },
+            { key: 'budgets', label: 'Budgets par catégorie', icon: '📊', desc: 'Limites par catégorie' },
+            { key: 'calendrier', label: 'Calendrier', icon: '📅', desc: 'Vue calendrier' },
+            { key: 'analyseAvancee', label: 'Analyse avancée', icon: '📈', desc: 'Graphiques sur 6/12 mois' },
+            { key: 'suggestions', label: 'Suggestions', icon: '💡', desc: 'Conseils intelligents' },
+            { key: 'tickets', label: 'Photos de tickets', icon: '📸', desc: 'Joindre des photos' },
+            { key: 'multiDevises', label: 'Multi-devises', icon: '🌍', desc: 'Conversion de devises' }
+        ];
+
+        let html = '<div class="form" style="gap: 0;">';
+        modules.forEach(m => {
+            const isActive = State.modules[m.key] === true;
+            html += `
+                <div class="switch-row">
+                    <div class="switch-row-body">
+                        <div class="switch-row-title">${m.icon} ${m.label}</div>
+                        <div class="switch-row-desc">${m.desc}</div>
+                    </div>
+                    <div class="switch module-switch ${isActive ? 'active' : ''}" data-module="${m.key}"></div>
+                </div>
+            `;
+        });
+        html += '</div>';
+
+        Router.openSheet('modules', 'Modules actifs', html);
+
+        // Attacher les événements
+        setTimeout(() => {
+            document.querySelectorAll('.module-switch').forEach(sw => {
+                sw.addEventListener('click', () => {
+                    const moduleName = sw.dataset.module;
+                    State.modules[moduleName] = !State.modules[moduleName];
+                    sw.classList.toggle('active', State.modules[moduleName]);
+                    notifyStateChange();
+
+                    if (State.user && !State.isGuestMode) {
+                        CloudSync.saveSettings();
+                    }
+
+                    this.applyModulesVisibility();
+                });
+            });
+        }, 100);
+    },
+
+    /**
+     * Ouvre la sheet des réglages généraux
+     */
+    openSettingsSheet() {
+        const s = State.settings;
+
+        const html = `
+            <div class="form">
+                <div class="form-group">
+                    <label class="form-label">💼 Taux horaire (€/h)</label>
+                    <div class="stepper">
+                        <button class="stepper-btn" data-setting="tauxHoraire" data-delta="-0.5">−</button>
+                        <input type="number" id="settingTaux" value="${s.tauxHoraire}" step="0.5" min="0" inputmode="decimal">
+                        <button class="stepper-btn" data-setting="tauxHoraire" data-delta="0.5">+</button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">💱 Devise</label>
+                    <div class="grid-4">
+                        <button class="chip ${s.devise === '€' ? 'active' : ''}" data-devise="€">€</button>
+                        <button class="chip ${s.devise === '$' ? 'active' : ''}" data-devise="$">$</button>
+                        <button class="chip ${s.devise === '£' ? 'active' : ''}" data-devise="£">£</button>
+                        <button class="chip ${s.devise === 'CHF' ? 'active' : ''}" data-devise="CHF">CHF</button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">⏱️ Arrondi du temps</label>
+                    <div class="grid-4">
+                        <button class="chip ${s.arrondi === 'none' ? 'active' : ''}" data-arrondi="none">Aucun</button>
+                        <button class="chip ${s.arrondi === '15' ? 'active' : ''}" data-arrondi="15">¼ h</button>
+                        <button class="chip ${s.arrondi === '30' ? 'active' : ''}" data-arrondi="30">½ h</button>
+                        <button class="chip ${s.arrondi === '60' ? 'active' : ''}" data-arrondi="60">1 h</button>
+                    </div>
+                    <div class="form-hint">Ex : 1h35 → 2h avec "½ h"</div>
+                </div>
+
+                <button class="btn btn-success btn-block" id="btnSaveSettings">
+                    💾 Sauvegarder
+                </button>
+            </div>
+        `;
+
+        Router.openSheet('settings', 'Réglages généraux', html);
+
+        setTimeout(() => {
+            // Stepper
+            document.querySelectorAll('.stepper-btn[data-setting]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const input = document.getElementById('settingTaux');
+                    const delta = parseFloat(btn.dataset.delta);
+                    const val = parseFloat(input.value) + delta;
+                    if (val >= 0) input.value = val.toFixed(2);
+                });
+            });
+
+            // Chips devise
+            document.querySelectorAll('.chip[data-devise]').forEach(chip => {
+                chip.addEventListener('click', () => {
+                    document.querySelectorAll('.chip[data-devise]').forEach(c => c.classList.remove('active'));
+                    chip.classList.add('active');
+                });
+            });
+
+            // Chips arrondi
+            document.querySelectorAll('.chip[data-arrondi]').forEach(chip => {
+                chip.addEventListener('click', () => {
+                    document.querySelectorAll('.chip[data-arrondi]').forEach(c => c.classList.remove('active'));
+                    chip.classList.add('active');
+                });
+            });
+
+            // Sauvegarde
+            const btnSave = document.getElementById('btnSaveSettings');
+            if (btnSave) {
+                btnSave.addEventListener('click', () => {
+                    const taux = parseFloat(document.getElementById('settingTaux').value) || 0;
+                    const devise = document.querySelector('.chip[data-devise].active')?.dataset.devise || '€';
+                    const arrondi = document.querySelector('.chip[data-arrondi].active')?.dataset.arrondi || 'none';
+
+                    State.settings.tauxHoraire = taux;
+                    State.settings.devise = devise;
+                    State.settings.arrondi = arrondi;
+
+                    notifyStateChange();
+
+                    if (State.user && !State.isGuestMode) {
+                        CloudSync.saveSettings();
+                    }
+
+                    Router.closeSheet();
+                    Toast.success('⚙️ Réglages sauvegardés');
+                });
+            }
+        }, 100);
+    },
+
+    /**
+     * Ouvre la sheet de gestion du PIN
+     */
+    openPinManageSheet() {
+        const hasPin = Storage.hasPin();
+
+        let html;
+        if (hasPin) {
+            html = `
+                <div class="banner banner-success" style="margin-bottom: var(--space-md);">
+                    <span class="banner-icon">🔒</span>
+                    <div class="banner-body">
+                        <div class="banner-title">Code PIN activé</div>
+                        <div class="banner-text">Votre application est protégée</div>
+                    </div>
+                </div>
+                <div class="form">
+                    <button class="btn btn-primary btn-block" id="btnChangePin">
+                        🔄 Changer le code
+                    </button>
+                    <button class="btn btn-outline btn-block" style="color: var(--danger); border-color: rgba(255,107,107,0.3);" id="btnRemovePin">
+                        🗑️ Supprimer le code
+                    </button>
+                </div>
+            `;
+        } else {
+            html = `
+                <div class="banner" style="margin-bottom: var(--space-md);">
+                    <span class="banner-icon">🔓</span>
+                    <div class="banner-body">
+                        <div class="banner-title">Aucun code PIN</div>
+                        <div class="banner-text">Votre app n'est pas protégée</div>
+                    </div>
+                </div>
+                <p style="color: var(--text2); font-size: var(--text-sm); text-align: center; margin-bottom: var(--space-md);">
+                    Ajoutez un code à 6 chiffres pour protéger l'accès à vos données financières.
+                </p>
+                <button class="btn btn-primary btn-block" id="btnSetPin">
+                    🔐 Définir un code PIN
+                </button>
+            `;
+        }
+
+        Router.openSheet('pin-manage', 'Code PIN', html);
+
+        setTimeout(() => {
+            const btnSet = document.getElementById('btnSetPin');
+            if (btnSet) btnSet.addEventListener('click', () => PinLock.openPinModal('setup'));
+
+            const btnChange = document.getElementById('btnChangePin');
+            if (btnChange) btnChange.addEventListener('click', () => PinLock.openPinModal('change-verify'));
+
+            const btnRemove = document.getElementById('btnRemovePin');
+            if (btnRemove) btnRemove.addEventListener('click', () => PinLock.openPinModal('remove'));
+        }, 100);
+    },
+
+    /**
+     * ==========================================
+     * ACTIONS DE DONNÉES
+     * ==========================================
+     */
+
+    handleExport() {
+        if (Storage.downloadExport()) {
+            Toast.success('📤 Données exportées !');
+        } else {
+            Toast.error('❌ Erreur export');
+        }
+    },
+
+    handleImport() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        input.style.display = 'none';
+
+        input.addEventListener('change', () => {
+            if (input.files.length > 0) {
+                Storage.importFromFile(input.files[0])
+                    .then(success => {
+                        if (success) {
+                            Toast.success('📥 Données importées !');
+                            this.refreshUI();
+
+                            if (State.user && !State.isGuestMode) {
+                                localStorage.removeItem(Storage.KEYS.UPLOADED + State.user.uid);
+                                CloudSync.uploadLocalData(State.user.uid);
+                            }
+                        } else {
+                            Toast.error('❌ Erreur import');
+                        }
+                    })
+                    .catch(err => Toast.error('❌ ' + err.message));
+            }
+            document.body.removeChild(input);
+        });
+
+        document.body.appendChild(input);
+        input.click();
+    },
+
+    confirmReset() {
+        const html = `
+            <p style="color: var(--text2); text-align: center; margin-bottom: var(--space-lg);">
+                Toutes vos données seront définitivement effacées.<br>
+                <strong style="color: var(--danger);">Cette action est irréversible.</strong>
+            </p>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="Router.closeSheet()">Annuler</button>
+                <button class="btn btn-danger" id="btnConfirmReset">Tout effacer</button>
+            </div>
+        `;
+
+        Router.openSheet('confirm-reset', '⚠️ Tout supprimer ?', html);
+
+        setTimeout(() => {
+            const btn = document.getElementById('btnConfirmReset');
+            if (btn) {
+                btn.addEventListener('click', async () => {
+                    // Effacer local
+                    Storage.clearAll();
+
+                    // Effacer cloud si connecté
+                    if (State.user && !State.isGuestMode) {
+                        await CloudSync.deleteAllData();
+                    }
+
+                    Router.closeSheet();
+                    Toast.success('🗑️ Tout a été effacé');
+
+                    setTimeout(() => location.reload(), 800);
+                });
+            }
+        }, 100);
+    },
+
+    /**
+     * ==========================================
+     * ÉVÉNEMENTS AUTH
+     * ==========================================
+     */
+
+    onSignedIn() {
+        this.updateAccountUI();
+        this.refreshCurrentPage();
+        this.updateSyncStatus();
+    },
+
+    onSignedOut() {
+        this.updateAccountUI();
+        this.updateSyncStatus();
+    },
+
+    onGuestMode() {
+        this.updateAccountUI();
+        this.updateSyncStatus();
+    },
+
+    /**
+     * Met à jour l'UI du compte
+     */
+    updateAccountUI() {
+        // Label du menu
+        const label = document.getElementById('menuAccountLabel');
+        const sub = document.getElementById('menuAccountSub');
+        const icon = document.getElementById('menuAccountIcon');
+
+        if (label && sub && icon) {
+            if (State.user) {
+                label.textContent = State.user.email || 'Connecté';
+                sub.textContent = '☁️ Synchronisé';
+                icon.textContent = '👤';
+            } else if (State.isGuestMode) {
+                label.textContent = 'Mode local';
+                sub.textContent = 'Vos données sont sur cet appareil';
+                icon.textContent = '👤';
+            } else {
+                label.textContent = 'Se connecter';
+                sub.textContent = 'Créer un compte';
+                icon.textContent = '🔗';
+            }
+        }
+
+        // Boutons Sign out / Sync
+        const btnSignOut = document.getElementById('btnSignOut');
+        const btnSyncManual = document.getElementById('btnSyncManual');
+
+        if (btnSignOut) btnSignOut.hidden = !State.user;
+        if (btnSyncManual) btnSyncManual.hidden = !State.user;
+
+        // PIN dans le menu
+        const pinIcon = document.getElementById('menuPinIcon');
+        const pinSub = document.getElementById('menuPinSub');
+        if (pinIcon && pinSub) {
+            if (Storage.hasPin()) {
+                pinIcon.textContent = '🔒';
+                pinSub.textContent = 'Activé';
+            } else {
+                pinIcon.textContent = '🔓';
+                pinSub.textContent = 'Désactivé';
+            }
+        }
+
+        // Bouton lock dans le header
+        const btnLock = document.getElementById('btnLock');
+        if (btnLock) btnLock.hidden = !Storage.hasPin();
+    },
+
+    /**
+     * Met à jour l'indicateur de sync
+     */
+    updateSyncStatus() {
+        const status = document.getElementById('syncStatus');
+        const dot = document.getElementById('syncDot');
+
+        if (!status || !dot) return;
+
+        if (State.user) {
+            status.hidden = false;
+            dot.style.background = 'var(--success)';
+            dot.style.boxShadow = '0 0 8px var(--success-glow)';
+        } else {
+            status.hidden = true;
+        }
+    },
+
+    /**
+     * ==========================================
+     * RAFRAÎCHISSEMENT UI
+     * ==========================================
+     */
+
     refreshUI() {
         this.applyTheme(State.settings.theme || 'purple');
         this.applyModulesVisibility();
+        this.updateAccountUI();
+        this.refreshCurrentPage();
+    },
 
+    refreshCurrentPage() {
         const current = State.currentPage || 'home';
-        Router.navigateTo(current, false);
+        this.onPageChanged(current);
     },
 
     /**
-     * Applique l’affichage selon les modules activés/désactivés
+     * Applique visibilité modules
      */
     applyModulesVisibility() {
-        // Pour le Lot 1, on masque uniquement les entrées des menus.
-        // Les vrais modules seront connectés dans les lots suivants.
-
         const moduleMap = {
             horaires: ['[data-add="horaire"]', '[data-more="horaires"]'],
             revenus: ['[data-add="revenu"]'],
             depenses: ['[data-add="depense"]'],
             epargne: ['[data-add="epargne"]', '[data-more="epargne"]'],
-            objectifs: ['[data-add="objectif"]', '[data-more="objectifs"]', '[data-nav="objectifs"]'],
+            objectifs: ['[data-add="objectif"]', '[data-more="objectifs"]'],
             shopping: ['[data-add="shopping"]'],
             recurrent: ['[data-add="recurrent"]'],
             calendrier: ['[data-more="calendrier"]']
@@ -279,7 +820,6 @@ const App = {
 
         Object.entries(moduleMap).forEach(([module, selectors]) => {
             const active = State.modules[module] === true;
-
             selectors.forEach(selector => {
                 document.querySelectorAll(selector).forEach(el => {
                     el.hidden = !active;
@@ -289,58 +829,96 @@ const App = {
     },
 
     /**
-     * Placeholder Accueil
+     * ==========================================
+     * PAGES
+     * ==========================================
      */
-    renderHomePlaceholder() {
-        const page = document.querySelector('#page-home .page-content');
-        if (!page) return;
 
-        // Pour le Lot 1, on garde un dashboard simplifié.
-        // Les vraies cartes seront branchées au Lot 3.
-        page.innerHTML = `
+    onPageChanged(page, previous) {
+        console.log(`📄 Page: ${previous || 'none'} → ${page}`);
+
+        switch (page) {
+            case 'home':
+                this.renderHome();
+                break;
+            case 'add':
+                this.applyModulesVisibility();
+                break;
+            case 'more':
+                this.updateAccountUI();
+                break;
+        }
+    },
+
+    /**
+     * Rendu du dashboard (temporaire pour Lot 2)
+     */
+    renderHome() {
+        const container = document.getElementById('homeContent');
+        if (!container) return;
+
+        const currentMonth = StateHelpers.currentMonth();
+        const revenus = StateHelpers.computeMonthlyRevenue(currentMonth);
+        const dep = StateHelpers.computeMonthlyExpenses(currentMonth);
+        const solde = revenus.totalReel - dep;
+        const soldeAffiche = revenus.salaireEstime ? revenus.totalEstime - dep : solde;
+
+        container.innerHTML = `
             <div class="card card-glow animate-slide-up">
                 <div class="card-header">
                     <div>
                         <div class="card-title">Bienvenue 👋</div>
-                        <div class="card-subtitle">Nouvelle version ergonomique v5</div>
+                        <div class="card-subtitle">${State.user ? State.user.email : 'Mode local'}</div>
                     </div>
-                    <span style="font-size:2rem">💰</span>
+                    <span style="font-size: 2rem;">💰</span>
                 </div>
                 <p class="text-secondary text-sm">
-                    L'application a été restructurée pour être plus claire, plus rapide et plus facile à améliorer.
+                    Lot 2 installé : authentification, code PIN et synchronisation cloud.
                 </p>
             </div>
 
             <div class="stat-grid animate-slide-up">
                 <div class="stat-card">
-                    <span class="stat-icon">⏰</span>
-                    <span class="stat-value">${State.data.horaires.length}</span>
-                    <span class="stat-label">Horaires</span>
+                    <span class="stat-icon">💵</span>
+                    <span class="stat-value" style="color: var(--success);">${Format.money(revenus.totalReel)}</span>
+                    <span class="stat-label">Revenus reçus</span>
                 </div>
                 <div class="stat-card">
                     <span class="stat-icon">💳</span>
-                    <span class="stat-value">${State.data.depenses.length}</span>
+                    <span class="stat-value" style="color: var(--danger);">${Format.money(dep)}</span>
                     <span class="stat-label">Dépenses</span>
                 </div>
                 <div class="stat-card">
-                    <span class="stat-icon">🏦</span>
-                    <span class="stat-value">${Format.money(StateHelpers.getEpargneSolde())}</span>
-                    <span class="stat-label">Épargne</span>
+                    <span class="stat-icon">📊</span>
+                    <span class="stat-value" style="color: ${solde >= 0 ? 'var(--success)' : 'var(--danger)'};">${Format.money(solde, true)}</span>
+                    <span class="stat-label">Solde réel</span>
                 </div>
                 <div class="stat-card">
-                    <span class="stat-icon">🎯</span>
-                    <span class="stat-value">${State.data.objectifs.length}</span>
-                    <span class="stat-label">Objectifs</span>
+                    <span class="stat-icon">🏦</span>
+                    <span class="stat-value" style="color: var(--primary-light);">${Format.money(StateHelpers.getEpargneSolde())}</span>
+                    <span class="stat-label">Épargne</span>
                 </div>
             </div>
+
+            ${revenus.salaireEstime ? `
+                <div class="banner banner-warning animate-slide-up">
+                    <span class="banner-icon">⏳</span>
+                    <div class="banner-body">
+                        <div class="banner-title">Paie estimée</div>
+                        <div class="banner-text">
+                            Vous devriez recevoir ~${Format.money(revenus.gainPrevu)} basé sur vos heures de ${Format.monthShort(StateHelpers.getPreviousMonth(currentMonth))}
+                        </div>
+                    </div>
+                </div>
+            ` : ''}
 
             <div class="banner banner-info animate-slide-up">
                 <span class="banner-icon">🚧</span>
                 <div class="banner-body">
-                    <div class="banner-title">Lot 1 installé</div>
+                    <div class="banner-title">Lot 2 installé</div>
                     <div class="banner-text">
-                        Navigation, thèmes, stockage et structure propre sont prêts.
-                        Les vrais modules arrivent dans les prochains lots.
+                        Auth Firebase, PIN, sync cloud opérationnels.
+                        Formulaires et fonctionnalités complètes dans le Lot 3.
                     </div>
                 </div>
             </div>
@@ -348,52 +926,61 @@ const App = {
     },
 
     /**
-     * Menu Ajouter
+     * ==========================================
+     * RACCOURCIS CLAVIER
+     * ==========================================
      */
-    refreshAddMenu() {
-        // Rien de spécial pour Lot 1
-        this.applyModulesVisibility();
+    setupKeyboardShortcuts() {
+        document.addEventListener('keydown', (e) => {
+            const tag = document.activeElement.tagName.toLowerCase();
+            if (['input', 'textarea', 'select'].includes(tag)) return;
+
+            // 1-5 : navigation
+            if (e.key >= '1' && e.key <= '5') {
+                const index = parseInt(e.key) - 1;
+                const page = Router.pages[index];
+                if (page) Router.navigateTo(page);
+            }
+
+            if (e.key === 'Escape') Router.closeSheet();
+        });
     },
 
     /**
-     * Placeholder Budget
+     * ==========================================
+     * DIVERS
+     * ==========================================
      */
-    refreshBudgetPlaceholder() {
-        // Rien de spécial pour Lot 1
-    },
 
-    /**
-     * Placeholder Analyse
-     */
-    refreshAnalysePlaceholder() {
-        // Rien de spécial pour Lot 1
-    },
+    onAppResume() {
+        console.log('🔄 App reprise');
 
-    /**
-     * Rafraîchit la page Plus
-     */
-    refreshMorePage() {
-        const accountLabel = document.getElementById('menuAccountLabel');
-        if (accountLabel) {
-            accountLabel.textContent = State.user ? (State.user.email || 'Connecté') : 'Mode local';
+        // Vérifier PIN si activé
+        if (Storage.hasPin() && this.initialized) {
+            const timeSinceLastUse = Date.now() - (this._lastActivity || 0);
+            // Si plus de 5 minutes, redemander le PIN
+            if (timeSinceLastUse > 5 * 60 * 1000) {
+                PinLock.showLockScreen();
+            }
         }
-
-        this.applyModulesVisibility();
+        this._lastActivity = Date.now();
     },
 
     /**
-     * Utilitaire pour ajouter une donnée
+     * Ajouter une donnée
      */
     addData(collection, item) {
-        if (!State.data[collection]) {
-            console.error('Collection inconnue:', collection);
-            return false;
-        }
+        if (!State.data[collection]) return false;
 
         item.id = item.id || StateHelpers.generateId();
         State.data[collection].push(item);
 
         notifyStateChange();
+
+        // Sync cloud
+        if (State.user && !State.isGuestMode) {
+            CloudSync.saveItem(collection, item);
+        }
 
         document.dispatchEvent(new CustomEvent('data:added', {
             detail: { collection, item }
@@ -403,17 +990,19 @@ const App = {
     },
 
     /**
-     * Utilitaire pour supprimer une donnée
+     * Supprimer une donnée
      */
     removeData(collection, id) {
-        if (!State.data[collection]) {
-            console.error('Collection inconnue:', collection);
-            return false;
-        }
+        if (!State.data[collection]) return false;
 
         State.data[collection] = State.data[collection].filter(item => item.id !== id);
 
         notifyStateChange();
+
+        // Sync cloud
+        if (State.user && !State.isGuestMode) {
+            CloudSync.deleteItem(collection, id);
+        }
 
         document.dispatchEvent(new CustomEvent('data:removed', {
             detail: { collection, id }
@@ -423,24 +1012,20 @@ const App = {
     },
 
     /**
-     * Utilitaire pour mettre à jour une donnée
+     * Mettre à jour une donnée
      */
     updateData(collection, id, patch) {
-        if (!State.data[collection]) {
-            console.error('Collection inconnue:', collection);
-            return false;
-        }
+        if (!State.data[collection]) return false;
 
         const item = State.data[collection].find(item => item.id === id);
         if (!item) return false;
 
         Object.assign(item, patch);
-
         notifyStateChange();
 
-        document.dispatchEvent(new CustomEvent('data:updated', {
-            detail: { collection, id, patch }
-        }));
+        if (State.user && !State.isGuestMode) {
+            CloudSync.saveItem(collection, item);
+        }
 
         return true;
     }
@@ -448,7 +1033,7 @@ const App = {
 
 /**
  * ==========================================
- * Toast notifications
+ * TOAST NOTIFICATIONS
  * ==========================================
  */
 const Toast = {
@@ -471,38 +1056,17 @@ const Toast = {
         container.appendChild(toast);
 
         setTimeout(() => {
-            if (toast.parentNode) {
-                toast.parentNode.removeChild(toast);
-            }
+            if (toast.parentNode) toast.parentNode.removeChild(toast);
         }, 3000);
     },
 
-    success(message) {
-        this.show(message, 'success');
-    },
-
-    error(message) {
-        this.show(message, 'error');
-    },
-
-    warning(message) {
-        this.show(message, 'warning');
-    },
-
-    info(message) {
-        this.show(message, 'default');
-    }
+    success(msg) { this.show(msg, 'success'); },
+    error(msg) { this.show(msg, 'error'); },
+    warning(msg) { this.show(msg, 'warning'); },
+    info(msg) { this.show(msg, 'default'); }
 };
 
-/**
- * ==========================================
- * Helpers globaux temporaires
- * Ces helpers permettront de garder une API simple
- * pendant qu'on découpe progressivement l'application.
- * ==========================================
- */
-
-// Alias temporaire pour compatibilité future
+// Aliases globaux
 window.App = App;
 window.State = State;
 window.StateHelpers = StateHelpers;
@@ -510,10 +1074,12 @@ window.Format = Format;
 window.Storage = Storage;
 window.Router = Router;
 window.Toast = Toast;
+window.Auth = Auth;
+window.PinLock = PinLock;
+window.CloudSync = CloudSync;
+window.FirebaseService = FirebaseService;
 
 /**
- * Démarrage réel quand le DOM est prêt
+ * Démarrage
  */
-document.addEventListener('DOMContentLoaded', function () {
-    App.init();
-});
+document.addEventListener('DOMContentLoaded', () => App.init());
