@@ -1,15 +1,13 @@
 /* ============================================
-   APP.JS - Point d'entrée principal v5 (Lot 2)
+   APP.JS - Point d'entrée principal v5 FINAL
    ============================================ */
 
 'use strict';
 
-/**
- * Application principale
- */
 const App = {
 
     initialized: false,
+    _lastActivity: Date.now(),
 
     /**
      * ==========================================
@@ -17,7 +15,7 @@ const App = {
      * ==========================================
      */
     async init() {
-        console.log('🚀 Initialisation MonBudget v5...');
+        console.log('🚀 Initialisation MonBudget v5 FINAL...');
 
         try {
             // 1. Charger les données locales + migration
@@ -26,37 +24,35 @@ const App = {
             // 2. Appliquer le thème
             this.applyTheme(State.settings.theme || 'purple');
 
-            // 3. Initialiser Firebase (optionnel, silencieux si non config)
+            // 3. Initialiser Firebase
             const firebaseOk = FirebaseService.init();
 
-            // 4. Initialiser le système d'auth
-            if (firebaseOk) {
-                Auth.init();
-            }
+            // 4. Initialiser Auth
+            if (firebaseOk) Auth.init();
 
-            // 5. Initialiser le système PIN
+            // 5. Initialiser PIN
             PinLock.init();
 
-            // 6. Initialiser le router / navigation
+            // 6. Initialiser Router
             Router.init();
 
             // 7. Événements globaux
             this.setupGlobalEvents();
 
-            // 8. Raccourcis clavier desktop
+            // 8. Raccourcis clavier
             this.setupKeyboardShortcuts();
 
-            // 9. Appliquer visibilité des modules
+            // 9. Visibilité modules
             this.applyModulesVisibility();
 
-            // 10. Décider quel écran afficher au démarrage
+            // 10. Écran de démarrage
             await this.decideStartScreen(firebaseOk);
 
             this.initialized = true;
-            console.log('✅ MonBudget v5 initialisé');
+            console.log('✅ MonBudget v5 FINAL initialisé');
 
         } catch (error) {
-            console.error('❌ Erreur initialisation:', error);
+            console.error('❌ Erreur init:', error);
             this.showFatalError(error);
         }
     },
@@ -65,10 +61,9 @@ const App = {
      * Décide quel écran afficher au démarrage
      */
     async decideStartScreen(firebaseAvailable) {
-        // Attendre un peu pour laisser Firebase vérifier l'auth
         await new Promise(resolve => setTimeout(resolve, 500));
 
-        // Cas 1 : Firebase dispo + utilisateur connecté
+        // Si Firebase connecté
         if (firebaseAvailable && FirebaseService.auth && FirebaseService.auth.currentUser) {
             State.user = {
                 uid: FirebaseService.auth.currentUser.uid,
@@ -77,29 +72,21 @@ const App = {
             State.isGuestMode = false;
             this.hideSplash();
 
-            // Vérifier PIN
-            if (Storage.hasPin()) {
-                PinLock.checkOnStart();
-            }
+            if (Storage.hasPin()) PinLock.checkOnStart();
             return;
         }
 
-        // Cas 2 : Mode local déjà activé auparavant
+        // Si Firebase indispo ou mode local
         if (State.isGuestMode || !firebaseAvailable) {
+            State.isGuestMode = true;
             this.hideSplash();
-
-            // Vérifier PIN
-            if (Storage.hasPin()) {
-                PinLock.checkOnStart();
-            }
+            if (Storage.hasPin()) PinLock.checkOnStart();
             return;
         }
 
-        // Cas 3 : Utilisateur pas connecté et Firebase dispo → écran auth
+        // Sinon écran connexion
         this.hideSplash();
-        setTimeout(() => {
-            Auth.showAuthScreen();
-        }, 300);
+        setTimeout(() => Auth.showAuthScreen(), 300);
     },
 
     /**
@@ -124,26 +111,24 @@ const App = {
         }
 
         State.settings.theme = theme;
-        notifyStateChange();
+        Storage.saveSection('settings');
 
-        // Sync cloud si connecté
         if (State.user && !State.isGuestMode) {
             CloudSync.saveSettings();
         }
 
         document.dispatchEvent(new CustomEvent('theme:changed', { detail: { theme } }));
 
-        // Mettre à jour le label dans "Plus"
         const themeLabel = document.getElementById('menuThemeLabel');
         if (themeLabel) {
-            const themeInfo = THEMES_DISPONIBLES.find(t => t.id === theme);
-            themeLabel.textContent = themeInfo ? themeInfo.label : theme;
+            const t = THEMES_DISPONIBLES.find(x => x.id === theme);
+            themeLabel.textContent = t ? t.label : theme;
         }
     },
 
     /**
      * ==========================================
-     * SPLASH SCREEN
+     * SPLASH
      * ==========================================
      */
     hideSplash() {
@@ -160,11 +145,9 @@ const App = {
         });
     },
 
-    /**
-     * Affiche une erreur critique
-     */
     showFatalError(error) {
         const splash = document.getElementById('splashScreen');
+
         if (!splash) {
             alert('Erreur : ' + error.message);
             return;
@@ -183,7 +166,7 @@ const App = {
 
     /**
      * ==========================================
-     * ÉVÉNEMENTS GLOBAUX
+     * EVENTS GLOBAUX
      * ==========================================
      */
     setupGlobalEvents() {
@@ -193,61 +176,52 @@ const App = {
         });
 
         // Auth
-        document.addEventListener('auth:signedin', () => {
-            this.onSignedIn();
-        });
+        document.addEventListener('auth:signedin', () => this.onSignedIn());
+        document.addEventListener('auth:signedout', () => this.onSignedOut());
+        document.addEventListener('auth:guest', () => this.onGuestMode());
 
-        document.addEventListener('auth:signedout', () => {
-            this.onSignedOut();
-        });
-
-        document.addEventListener('auth:guest', () => {
-            this.onGuestMode();
-        });
-
-        // Data
+        // Import
         document.addEventListener('data:imported', () => this.refreshUI());
+
+        // Cloud
         document.addEventListener('cloud:updated', () => this.refreshCurrentPage());
 
-        // Sync
-        document.addEventListener('state:saved', () => {
-            this.updateSyncStatus();
-        });
+        // Sauvegarde
+        document.addEventListener('state:saved', () => this.updateSyncStatus());
 
-        // Boutons du menu "Plus"
+        // Menu Plus
         this.setupMoreMenuEvents();
 
-        // Boutons de compte
+        // Boutons compte
         const btnSignOut = document.getElementById('btnSignOut');
-        if (btnSignOut) {
-            btnSignOut.addEventListener('click', () => Auth.handleSignOut());
-        }
+        if (btnSignOut) btnSignOut.addEventListener('click', () => Auth.handleSignOut());
 
         const btnSyncManual = document.getElementById('btnSyncManual');
-        if (btnSyncManual) {
-            btnSyncManual.addEventListener('click', () => CloudSync.manualSync());
-        }
+        if (btnSyncManual) btnSyncManual.addEventListener('click', () => CloudSync.manualSync());
 
-        // Bouton lock (header)
+        // Bouton lock
         const btnLock = document.getElementById('btnLock');
-        if (btnLock) {
-            btnLock.addEventListener('click', () => PinLock.showLockScreen());
-        }
+        if (btnLock) btnLock.addEventListener('click', () => PinLock.showLockScreen());
 
-        // Visibilité (retour app)
+        // App resume
         document.addEventListener('visibilitychange', () => {
             if (!document.hidden) this.onAppResume();
         });
 
-        // Beforeinstallprompt (PWA)
+        // PWA install
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
             this.deferredInstallPrompt = e;
         });
+
+        // Track activity
+        ['click', 'touchstart', 'keydown'].forEach(evt => {
+            document.addEventListener(evt, () => this._lastActivity = Date.now(), { passive: true });
+        });
     },
 
     /**
-     * Configure les événements du menu "Plus"
+     * Menu Plus
      */
     setupMoreMenuEvents() {
         document.querySelectorAll('.menu-item[data-more]').forEach(item => {
@@ -259,7 +233,7 @@ const App = {
     },
 
     /**
-     * Gère les actions du menu "Plus"
+     * Actions du menu Plus
      */
     handleMoreAction(action) {
         switch (action) {
@@ -273,7 +247,7 @@ const App = {
                 this.openModulesSheet();
                 break;
             case 'widgets':
-                Toast.info('🚧 Widgets personnalisables (Lot 3)');
+                this.openWidgetsSheet();
                 break;
             case 'settings':
                 this.openSettingsSheet();
@@ -291,10 +265,16 @@ const App = {
                 this.confirmReset();
                 break;
             case 'epargne':
+                Epargne.renderPage();
+                break;
             case 'objectifs':
+                Objectifs.renderPage();
+                break;
             case 'horaires':
+                this.openHorairesPage();
+                break;
             case 'calendrier':
-                Toast.info('🚧 Disponible dans le Lot 3');
+                Toast.info('📅 Calendrier dans le Lot 4');
                 break;
             default:
                 console.log('Action inconnue:', action);
@@ -302,19 +282,49 @@ const App = {
     },
 
     /**
+     * Actions du menu Ajouter
+     */
+    handleAddAction(type) {
+        switch (type) {
+            case 'horaire':
+                Horaires.openAddForm();
+                break;
+            case 'depense':
+                Depenses.openAddForm();
+                break;
+            case 'revenu':
+                Revenus.openAddForm();
+                break;
+            case 'epargne':
+                Epargne.openAddForm();
+                break;
+            case 'objectif':
+                Objectifs.openAddForm();
+                break;
+            case 'shopping':
+                Shopping.openAddForm();
+                break;
+            case 'recurrent':
+                Recurrent.openAddForm();
+                break;
+            case 'budget':
+                Budgets.openAddForm();
+                break;
+            default:
+                Toast.info('Action inconnue');
+        }
+    },
+
+    /**
      * ==========================================
-     * SHEETS D'ACTIONS
+     * SHEETS PLUS
      * ==========================================
      */
 
-    /**
-     * Ouvre la sheet du compte
-     */
     openAccountSheet() {
         let content;
 
         if (State.user) {
-            // Connecté
             content = `
                 <div class="banner banner-success" style="margin-bottom: var(--space-md);">
                     <span class="banner-icon">☁️</span>
@@ -323,6 +333,7 @@ const App = {
                         <div class="banner-text">${State.user.email}</div>
                     </div>
                 </div>
+
                 <div class="form">
                     <button class="btn btn-outline btn-block" onclick="CloudSync.manualSync()">
                         🔄 Synchroniser maintenant
@@ -333,7 +344,6 @@ const App = {
                 </div>
             `;
         } else if (State.isGuestMode) {
-            // Mode local
             content = `
                 <div class="banner" style="margin-bottom: var(--space-md);">
                     <span class="banner-icon">👤</span>
@@ -350,7 +360,6 @@ const App = {
                 </button>
             `;
         } else {
-            // Firebase indisponible
             content = `
                 <div class="banner banner-warning" style="margin-bottom: var(--space-md);">
                     <span class="banner-icon">⚠️</span>
@@ -359,26 +368,19 @@ const App = {
                         <div class="banner-text">Firebase n'est pas configuré</div>
                     </div>
                 </div>
-                <p style="color: var(--text3); font-size: var(--text-xs); text-align: center;">
-                    Éditez <code>js/firebase.js</code> pour configurer votre projet Firebase.
-                </p>
             `;
         }
 
         Router.openSheet('account', 'Mon compte', content);
     },
 
-    /**
-     * Ouvre la sheet du thème
-     */
     openThemeSheet() {
         const currentTheme = State.settings.theme || 'purple';
-        let html = '<div class="theme-grid">';
 
+        let html = '<div class="theme-grid">';
         THEMES_DISPONIBLES.forEach(t => {
-            const isActive = t.id === currentTheme;
             html += `
-                <button class="theme-option ${isActive ? 'active' : ''}" data-theme="${t.id}">
+                <button class="theme-option ${t.id === currentTheme ? 'active' : ''}" data-theme="${t.id}">
                     <div class="theme-preview theme-preview-${t.id}">
                         <span></span><span></span><span></span>
                     </div>
@@ -386,17 +388,14 @@ const App = {
                 </button>
             `;
         });
-
         html += '</div>';
 
         Router.openSheet('theme', 'Choisir un thème', html);
 
-        // Attacher les événements
         setTimeout(() => {
             document.querySelectorAll('.theme-option').forEach(opt => {
                 opt.addEventListener('click', () => {
-                    const theme = opt.dataset.theme;
-                    this.applyTheme(theme);
+                    this.applyTheme(opt.dataset.theme);
                     Router.closeSheet();
                     Toast.success('🎨 Thème appliqué !');
                 });
@@ -404,9 +403,10 @@ const App = {
         }, 100);
     },
 
-    /**
-     * Ouvre la sheet des modules
-     */
+    openWidgetsSheet() {
+        Dashboard.openWidgetsSheet();
+    },
+
     openModulesSheet() {
         const modules = [
             { key: 'horaires', label: 'Horaires', icon: '⏰', desc: 'Suivi des heures de travail' },
@@ -425,23 +425,23 @@ const App = {
         ];
 
         let html = '<div class="form" style="gap: 0;">';
+
         modules.forEach(m => {
-            const isActive = State.modules[m.key] === true;
             html += `
                 <div class="switch-row">
                     <div class="switch-row-body">
                         <div class="switch-row-title">${m.icon} ${m.label}</div>
                         <div class="switch-row-desc">${m.desc}</div>
                     </div>
-                    <div class="switch module-switch ${isActive ? 'active' : ''}" data-module="${m.key}"></div>
+                    <div class="switch module-switch ${State.modules[m.key] ? 'active' : ''}" data-module="${m.key}"></div>
                 </div>
             `;
         });
+
         html += '</div>';
 
         Router.openSheet('modules', 'Modules actifs', html);
 
-        // Attacher les événements
         setTimeout(() => {
             document.querySelectorAll('.module-switch').forEach(sw => {
                 sw.addEventListener('click', () => {
@@ -449,31 +449,24 @@ const App = {
                     State.modules[moduleName] = !State.modules[moduleName];
                     sw.classList.toggle('active', State.modules[moduleName]);
                     notifyStateChange();
-
-                    if (State.user && !State.isGuestMode) {
-                        CloudSync.saveSettings();
-                    }
-
+                    if (State.user && !State.isGuestMode) CloudSync.saveSettings();
                     this.applyModulesVisibility();
                 });
             });
         }, 100);
     },
 
-    /**
-     * Ouvre la sheet des réglages généraux
-     */
     openSettingsSheet() {
         const s = State.settings;
 
         const html = `
             <div class="form">
                 <div class="form-group">
-                    <label class="form-label">💼 Taux horaire (€/h)</label>
+                    <label class="form-label">💼 Taux horaire (${s.devise}/h)</label>
                     <div class="stepper">
-                        <button class="stepper-btn" data-setting="tauxHoraire" data-delta="-0.5">−</button>
+                        <button class="stepper-btn" id="settingTauxMinus">−</button>
                         <input type="number" id="settingTaux" value="${s.tauxHoraire}" step="0.5" min="0" inputmode="decimal">
-                        <button class="stepper-btn" data-setting="tauxHoraire" data-delta="0.5">+</button>
+                        <button class="stepper-btn" id="settingTauxPlus">+</button>
                     </div>
                 </div>
 
@@ -495,7 +488,6 @@ const App = {
                         <button class="chip ${s.arrondi === '30' ? 'active' : ''}" data-arrondi="30">½ h</button>
                         <button class="chip ${s.arrondi === '60' ? 'active' : ''}" data-arrondi="60">1 h</button>
                     </div>
-                    <div class="form-hint">Ex : 1h35 → 2h avec "½ h"</div>
                 </div>
 
                 <button class="btn btn-success btn-block" id="btnSaveSettings">
@@ -507,17 +499,17 @@ const App = {
         Router.openSheet('settings', 'Réglages généraux', html);
 
         setTimeout(() => {
-            // Stepper
-            document.querySelectorAll('.stepper-btn[data-setting]').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const input = document.getElementById('settingTaux');
-                    const delta = parseFloat(btn.dataset.delta);
-                    const val = parseFloat(input.value) + delta;
-                    if (val >= 0) input.value = val.toFixed(2);
-                });
+            document.getElementById('settingTauxMinus')?.addEventListener('click', () => {
+                const i = document.getElementById('settingTaux');
+                const v = parseFloat(i.value) - 0.5;
+                if (v >= 0) i.value = v.toFixed(2);
             });
 
-            // Chips devise
+            document.getElementById('settingTauxPlus')?.addEventListener('click', () => {
+                const i = document.getElementById('settingTaux');
+                i.value = (parseFloat(i.value) + 0.5).toFixed(2);
+            });
+
             document.querySelectorAll('.chip[data-devise]').forEach(chip => {
                 chip.addEventListener('click', () => {
                     document.querySelectorAll('.chip[data-devise]').forEach(c => c.classList.remove('active'));
@@ -525,7 +517,6 @@ const App = {
                 });
             });
 
-            // Chips arrondi
             document.querySelectorAll('.chip[data-arrondi]').forEach(chip => {
                 chip.addEventListener('click', () => {
                     document.querySelectorAll('.chip[data-arrondi]').forEach(c => c.classList.remove('active'));
@@ -533,100 +524,73 @@ const App = {
                 });
             });
 
-            // Sauvegarde
-            const btnSave = document.getElementById('btnSaveSettings');
-            if (btnSave) {
-                btnSave.addEventListener('click', () => {
-                    const taux = parseFloat(document.getElementById('settingTaux').value) || 0;
-                    const devise = document.querySelector('.chip[data-devise].active')?.dataset.devise || '€';
-                    const arrondi = document.querySelector('.chip[data-arrondi].active')?.dataset.arrondi || 'none';
+            document.getElementById('btnSaveSettings')?.addEventListener('click', () => {
+                State.settings.tauxHoraire = parseFloat(document.getElementById('settingTaux').value) || 0;
+                State.settings.devise = document.querySelector('.chip[data-devise].active')?.dataset.devise || '€';
+                State.settings.arrondi = document.querySelector('.chip[data-arrondi].active')?.dataset.arrondi || 'none';
 
-                    State.settings.tauxHoraire = taux;
-                    State.settings.devise = devise;
-                    State.settings.arrondi = arrondi;
-
-                    notifyStateChange();
-
-                    if (State.user && !State.isGuestMode) {
-                        CloudSync.saveSettings();
+                // Recalculer les gains des horaires
+                State.data.horaires.forEach(h => {
+                    if (h.debut && h.fin) {
+                        const minutes = StateHelpers.calcMinutes(h.debut, h.fin, h.pause || 0);
+                        h.minutes = minutes;
+                        h.gain = (minutes / 60) * State.settings.tauxHoraire;
+                        if (State.user && !State.isGuestMode) CloudSync.saveItem('horaires', h);
                     }
-
-                    Router.closeSheet();
-                    Toast.success('⚙️ Réglages sauvegardés');
                 });
-            }
+
+                notifyStateChange();
+                if (State.user && !State.isGuestMode) CloudSync.saveSettings();
+                Router.closeSheet();
+                Toast.success('⚙️ Réglages sauvegardés');
+                this.refreshUI();
+            });
         }, 100);
     },
 
-    /**
-     * Ouvre la sheet de gestion du PIN
-     */
     openPinManageSheet() {
         const hasPin = Storage.hasPin();
 
-        let html;
-        if (hasPin) {
-            html = `
-                <div class="banner banner-success" style="margin-bottom: var(--space-md);">
-                    <span class="banner-icon">🔒</span>
-                    <div class="banner-body">
-                        <div class="banner-title">Code PIN activé</div>
-                        <div class="banner-text">Votre application est protégée</div>
-                    </div>
+        const html = hasPin ? `
+            <div class="banner banner-success" style="margin-bottom: var(--space-md);">
+                <span class="banner-icon">🔒</span>
+                <div class="banner-body">
+                    <div class="banner-title">Code PIN activé</div>
+                    <div class="banner-text">Votre application est protégée</div>
                 </div>
-                <div class="form">
-                    <button class="btn btn-primary btn-block" id="btnChangePin">
-                        🔄 Changer le code
-                    </button>
-                    <button class="btn btn-outline btn-block" style="color: var(--danger); border-color: rgba(255,107,107,0.3);" id="btnRemovePin">
-                        🗑️ Supprimer le code
-                    </button>
+            </div>
+            <div class="form">
+                <button class="btn btn-primary btn-block" id="btnChangePin">🔄 Changer le code</button>
+                <button class="btn btn-outline btn-block" style="color: var(--danger); border-color: rgba(255,107,107,0.3);" id="btnRemovePin">🗑️ Supprimer le code</button>
+            </div>
+        ` : `
+            <div class="banner" style="margin-bottom: var(--space-md);">
+                <span class="banner-icon">🔓</span>
+                <div class="banner-body">
+                    <div class="banner-title">Aucun code PIN</div>
+                    <div class="banner-text">Votre app n'est pas protégée</div>
                 </div>
-            `;
-        } else {
-            html = `
-                <div class="banner" style="margin-bottom: var(--space-md);">
-                    <span class="banner-icon">🔓</span>
-                    <div class="banner-body">
-                        <div class="banner-title">Aucun code PIN</div>
-                        <div class="banner-text">Votre app n'est pas protégée</div>
-                    </div>
-                </div>
-                <p style="color: var(--text2); font-size: var(--text-sm); text-align: center; margin-bottom: var(--space-md);">
-                    Ajoutez un code à 6 chiffres pour protéger l'accès à vos données financières.
-                </p>
-                <button class="btn btn-primary btn-block" id="btnSetPin">
-                    🔐 Définir un code PIN
-                </button>
-            `;
-        }
+            </div>
+            <button class="btn btn-primary btn-block" id="btnSetPin">🔐 Définir un code PIN</button>
+        `;
 
         Router.openSheet('pin-manage', 'Code PIN', html);
 
         setTimeout(() => {
-            const btnSet = document.getElementById('btnSetPin');
-            if (btnSet) btnSet.addEventListener('click', () => PinLock.openPinModal('setup'));
-
-            const btnChange = document.getElementById('btnChangePin');
-            if (btnChange) btnChange.addEventListener('click', () => PinLock.openPinModal('change-verify'));
-
-            const btnRemove = document.getElementById('btnRemovePin');
-            if (btnRemove) btnRemove.addEventListener('click', () => PinLock.openPinModal('remove'));
+            document.getElementById('btnSetPin')?.addEventListener('click', () => PinLock.openPinModal('setup'));
+            document.getElementById('btnChangePin')?.addEventListener('click', () => PinLock.openPinModal('change-verify'));
+            document.getElementById('btnRemovePin')?.addEventListener('click', () => PinLock.openPinModal('remove'));
         }, 100);
     },
 
     /**
      * ==========================================
-     * ACTIONS DE DONNÉES
+     * DONNÉES
      * ==========================================
      */
-
     handleExport() {
-        if (Storage.downloadExport()) {
-            Toast.success('📤 Données exportées !');
-        } else {
-            Toast.error('❌ Erreur export');
-        }
+        if (Storage.downloadExport()) Toast.success('📤 Données exportées !');
+        else Toast.error('❌ Erreur export');
     },
 
     handleImport() {
@@ -675,32 +639,25 @@ const App = {
         Router.openSheet('confirm-reset', '⚠️ Tout supprimer ?', html);
 
         setTimeout(() => {
-            const btn = document.getElementById('btnConfirmReset');
-            if (btn) {
-                btn.addEventListener('click', async () => {
-                    // Effacer local
-                    Storage.clearAll();
+            document.getElementById('btnConfirmReset')?.addEventListener('click', async () => {
+                Storage.clearAll();
 
-                    // Effacer cloud si connecté
-                    if (State.user && !State.isGuestMode) {
-                        await CloudSync.deleteAllData();
-                    }
+                if (State.user && !State.isGuestMode) {
+                    await CloudSync.deleteAllData();
+                }
 
-                    Router.closeSheet();
-                    Toast.success('🗑️ Tout a été effacé');
-
-                    setTimeout(() => location.reload(), 800);
-                });
-            }
+                Router.closeSheet();
+                Toast.success('🗑️ Tout a été effacé');
+                setTimeout(() => location.reload(), 800);
+            });
         }, 100);
     },
 
     /**
      * ==========================================
-     * ÉVÉNEMENTS AUTH
+     * AUTH EVENTS
      * ==========================================
      */
-
     onSignedIn() {
         this.updateAccountUI();
         this.refreshCurrentPage();
@@ -717,11 +674,7 @@ const App = {
         this.updateSyncStatus();
     },
 
-    /**
-     * Met à jour l'UI du compte
-     */
     updateAccountUI() {
-        // Label du menu
         const label = document.getElementById('menuAccountLabel');
         const sub = document.getElementById('menuAccountSub');
         const icon = document.getElementById('menuAccountIcon');
@@ -742,14 +695,12 @@ const App = {
             }
         }
 
-        // Boutons Sign out / Sync
         const btnSignOut = document.getElementById('btnSignOut');
         const btnSyncManual = document.getElementById('btnSyncManual');
 
         if (btnSignOut) btnSignOut.hidden = !State.user;
         if (btnSyncManual) btnSyncManual.hidden = !State.user;
 
-        // PIN dans le menu
         const pinIcon = document.getElementById('menuPinIcon');
         const pinSub = document.getElementById('menuPinSub');
         if (pinIcon && pinSub) {
@@ -762,14 +713,10 @@ const App = {
             }
         }
 
-        // Bouton lock dans le header
         const btnLock = document.getElementById('btnLock');
         if (btnLock) btnLock.hidden = !Storage.hasPin();
     },
 
-    /**
-     * Met à jour l'indicateur de sync
-     */
     updateSyncStatus() {
         const status = document.getElementById('syncStatus');
         const dot = document.getElementById('syncDot');
@@ -787,10 +734,9 @@ const App = {
 
     /**
      * ==========================================
-     * RAFRAÎCHISSEMENT UI
+     * UI REFRESH
      * ==========================================
      */
-
     refreshUI() {
         this.applyTheme(State.settings.theme || 'purple');
         this.applyModulesVisibility();
@@ -803,9 +749,6 @@ const App = {
         this.onPageChanged(current);
     },
 
-    /**
-     * Applique visibilité modules
-     */
     applyModulesVisibility() {
         const moduleMap = {
             horaires: ['[data-add="horaire"]', '[data-more="horaires"]'],
@@ -815,6 +758,7 @@ const App = {
             objectifs: ['[data-add="objectif"]', '[data-more="objectifs"]'],
             shopping: ['[data-add="shopping"]'],
             recurrent: ['[data-add="recurrent"]'],
+            budgets: ['[data-add="budget"]'],
             calendrier: ['[data-more="calendrier"]']
         };
 
@@ -830,99 +774,129 @@ const App = {
 
     /**
      * ==========================================
-     * PAGES
+     * PAGE CHANGED
      * ==========================================
      */
-
     onPageChanged(page, previous) {
         console.log(`📄 Page: ${previous || 'none'} → ${page}`);
 
         switch (page) {
             case 'home':
-                this.renderHome();
+                Dashboard.render();
                 break;
+
             case 'add':
                 this.applyModulesVisibility();
                 break;
+
+            case 'budget':
+                this.renderBudgetPage();
+                break;
+
+            case 'analyse':
+                this.renderAnalysePage();
+                break;
+
             case 'more':
                 this.updateAccountUI();
+                this.applyModulesVisibility();
                 break;
         }
     },
 
     /**
-     * Rendu du dashboard (temporaire pour Lot 2)
+     * PAGE BUDGET
      */
-    renderHome() {
-        const container = document.getElementById('homeContent');
-        if (!container) return;
+    renderBudgetPage() {
+        const segment = document.querySelector('#budgetSegments .segment.active')?.dataset.segment || 'depenses';
+        const content = document.getElementById('budgetContent');
 
-        const currentMonth = StateHelpers.currentMonth();
-        const revenus = StateHelpers.computeMonthlyRevenue(currentMonth);
-        const dep = StateHelpers.computeMonthlyExpenses(currentMonth);
-        const solde = revenus.totalReel - dep;
-        const soldeAffiche = revenus.salaireEstime ? revenus.totalEstime - dep : solde;
+        if (!content) return;
 
-        container.innerHTML = `
-            <div class="card card-glow animate-slide-up">
-                <div class="card-header">
-                    <div>
-                        <div class="card-title">Bienvenue 👋</div>
-                        <div class="card-subtitle">${State.user ? State.user.email : 'Mode local'}</div>
-                    </div>
-                    <span style="font-size: 2rem;">💰</span>
-                </div>
-                <p class="text-secondary text-sm">
-                    Lot 2 installé : authentification, code PIN et synchronisation cloud.
-                </p>
-            </div>
+        switch (segment) {
+            case 'depenses':
+                content.innerHTML = `
+                    <button class="btn btn-danger btn-block" onclick="Depenses.openAddForm()" style="margin-bottom: var(--space-md);">
+                        ➕ Nouvelle dépense
+                    </button>
+                    ${Depenses.renderPage()}
+                `;
+                setTimeout(() => {
+                    Depenses.init(content);
+                }, 50);
+                break;
 
-            <div class="stat-grid animate-slide-up">
-                <div class="stat-card">
-                    <span class="stat-icon">💵</span>
-                    <span class="stat-value" style="color: var(--success);">${Format.money(revenus.totalReel)}</span>
-                    <span class="stat-label">Revenus reçus</span>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-icon">💳</span>
-                    <span class="stat-value" style="color: var(--danger);">${Format.money(dep)}</span>
-                    <span class="stat-label">Dépenses</span>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-icon">📊</span>
-                    <span class="stat-value" style="color: ${solde >= 0 ? 'var(--success)' : 'var(--danger)'};">${Format.money(solde, true)}</span>
-                    <span class="stat-label">Solde réel</span>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-icon">🏦</span>
-                    <span class="stat-value" style="color: var(--primary-light);">${Format.money(StateHelpers.getEpargneSolde())}</span>
-                    <span class="stat-label">Épargne</span>
-                </div>
-            </div>
+            case 'shopping':
+                content.innerHTML = `
+                    <button class="btn btn-primary btn-block" onclick="Shopping.openAddForm()" style="margin-bottom: var(--space-md);">
+                        ➕ Nouvel achat
+                    </button>
+                    ${Shopping.renderPage()}
+                `;
+                setTimeout(() => {
+                    Shopping.refresh();
+                }, 50);
+                break;
 
-            ${revenus.salaireEstime ? `
-                <div class="banner banner-warning animate-slide-up">
-                    <span class="banner-icon">⏳</span>
-                    <div class="banner-body">
-                        <div class="banner-title">Paie estimée</div>
-                        <div class="banner-text">
-                            Vous devriez recevoir ~${Format.money(revenus.gainPrevu)} basé sur vos heures de ${Format.monthShort(StateHelpers.getPreviousMonth(currentMonth))}
-                        </div>
-                    </div>
-                </div>
-            ` : ''}
+            case 'recurrent':
+                content.innerHTML = `
+                    <button class="btn btn-primary btn-block" onclick="Recurrent.openAddForm()" style="margin-bottom: var(--space-md);">
+                        ➕ Nouvelle récurrente
+                    </button>
+                    ${Recurrent.renderPage()}
+                `;
+                setTimeout(() => {
+                    Recurrent.refresh();
+                }, 50);
+                break;
 
-            <div class="banner banner-info animate-slide-up">
-                <span class="banner-icon">🚧</span>
-                <div class="banner-body">
-                    <div class="banner-title">Lot 2 installé</div>
-                    <div class="banner-text">
-                        Auth Firebase, PIN, sync cloud opérationnels.
-                        Formulaires et fonctionnalités complètes dans le Lot 3.
-                    </div>
-                </div>
+            case 'budgets':
+                content.innerHTML = `
+                    <button class="btn btn-primary btn-block" onclick="Budgets.openAddForm()" style="margin-bottom: var(--space-md);">
+                        ➕ Nouveau budget
+                    </button>
+                    ${Budgets.renderPage()}
+                `;
+                setTimeout(() => {
+                    Budgets.refresh();
+                }, 50);
+                break;
+        }
+    },
+
+    /**
+     * PAGE ANALYSE
+     */
+    renderAnalysePage() {
+        const content = document.getElementById('analyseContent');
+        if (!content) return;
+
+        content.innerHTML = `
+            <div class="empty-page">
+                <div class="empty-icon">📊</div>
+                <h2>Analyse</h2>
+                <p>Graphiques avancés dans le Lot 4</p>
             </div>
         `;
+    },
+
+    /**
+     * HISTORIQUE HORAIRES
+     */
+    openHorairesPage() {
+        const html = `
+            <button class="btn btn-primary btn-block" onclick="Horaires.openAddForm()" style="margin-bottom: var(--space-md);">
+                ➕ Nouvel horaire
+            </button>
+            ${Horaires.renderPage()}
+        `;
+
+        Router.openSheet('horaires-page', '⏰ Historique horaires', html);
+
+        setTimeout(() => {
+            const container = document.getElementById('sheetContent');
+            Horaires.init(container);
+        }, 100);
     },
 
     /**
@@ -935,30 +909,24 @@ const App = {
             const tag = document.activeElement.tagName.toLowerCase();
             if (['input', 'textarea', 'select'].includes(tag)) return;
 
-            // 1-5 : navigation
             if (e.key >= '1' && e.key <= '5') {
                 const index = parseInt(e.key) - 1;
                 const page = Router.pages[index];
                 if (page) Router.navigateTo(page);
             }
 
+            if (e.key.toLowerCase() === 'a') Router.navigateTo('add');
+
             if (e.key === 'Escape') Router.closeSheet();
         });
     },
 
     /**
-     * ==========================================
-     * DIVERS
-     * ==========================================
+     * APP RESUME
      */
-
     onAppResume() {
-        console.log('🔄 App reprise');
-
-        // Vérifier PIN si activé
         if (Storage.hasPin() && this.initialized) {
             const timeSinceLastUse = Date.now() - (this._lastActivity || 0);
-            // Si plus de 5 minutes, redemander le PIN
             if (timeSinceLastUse > 5 * 60 * 1000) {
                 PinLock.showLockScreen();
             }
@@ -967,17 +935,21 @@ const App = {
     },
 
     /**
-     * Ajouter une donnée
+     * ==========================================
+     * DATA HELPERS
+     * ==========================================
      */
     addData(collection, item) {
-        if (!State.data[collection]) return false;
+        if (!State.data[collection]) {
+            console.error('Collection inconnue:', collection);
+            return false;
+        }
 
         item.id = item.id || StateHelpers.generateId();
         State.data[collection].push(item);
 
         notifyStateChange();
 
-        // Sync cloud
         if (State.user && !State.isGuestMode) {
             CloudSync.saveItem(collection, item);
         }
@@ -989,17 +961,16 @@ const App = {
         return true;
     },
 
-    /**
-     * Supprimer une donnée
-     */
     removeData(collection, id) {
-        if (!State.data[collection]) return false;
+        if (!State.data[collection]) {
+            console.error('Collection inconnue:', collection);
+            return false;
+        }
 
         State.data[collection] = State.data[collection].filter(item => item.id !== id);
 
         notifyStateChange();
 
-        // Sync cloud
         if (State.user && !State.isGuestMode) {
             CloudSync.deleteItem(collection, id);
         }
@@ -1011,21 +982,26 @@ const App = {
         return true;
     },
 
-    /**
-     * Mettre à jour une donnée
-     */
     updateData(collection, id, patch) {
-        if (!State.data[collection]) return false;
+        if (!State.data[collection]) {
+            console.error('Collection inconnue:', collection);
+            return false;
+        }
 
         const item = State.data[collection].find(item => item.id === id);
         if (!item) return false;
 
         Object.assign(item, patch);
+
         notifyStateChange();
 
         if (State.user && !State.isGuestMode) {
             CloudSync.saveItem(collection, item);
         }
+
+        document.dispatchEvent(new CustomEvent('data:updated', {
+            detail: { collection, id, patch }
+        }));
 
         return true;
     }
@@ -1078,6 +1054,15 @@ window.Auth = Auth;
 window.PinLock = PinLock;
 window.CloudSync = CloudSync;
 window.FirebaseService = FirebaseService;
+window.Dashboard = Dashboard;
+window.Horaires = Horaires;
+window.Depenses = Depenses;
+window.Revenus = Revenus;
+window.Epargne = Epargne;
+window.Objectifs = Objectifs;
+window.Shopping = Shopping;
+window.Recurrent = Recurrent;
+window.Budgets = Budgets;
 
 /**
  * Démarrage
