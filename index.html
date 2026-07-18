@@ -11,10 +11,13 @@
     <link rel="manifest" href="manifest.json">
 
     <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
 
     <title>💰 MonBudget</title>
 
+    <!-- CSS -->
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/themes.css">
     <link rel="stylesheet" href="css/layout.css">
@@ -37,9 +40,13 @@
             <div class="header-content">
                 <div class="header-left">
                     <h1 class="header-title" id="pageTitle">Accueil</h1>
-                    <p class="header-subtitle" id="pageSubtitle"></p>
+                    <p class="header-subtitle" id="pageSubtitle" hidden></p>
                 </div>
                 <div class="header-right">
+                    <div class="sync-status" id="syncStatus" hidden>
+                        <span class="sync-dot" id="syncDot"></span>
+                    </div>
+                    <button class="header-icon-btn" id="btnLock" title="Verrouiller" hidden>🔒</button>
                     <button class="header-icon-btn" id="btnHeaderAction" hidden>➕</button>
                 </div>
             </div>
@@ -48,21 +55,18 @@
         <!-- Main scrollable content -->
         <main class="app-main" id="appMain">
 
-            <!-- Page: Accueil -->
+            <!-- ========== PAGE : ACCUEIL ========== -->
             <section class="page" id="page-home" data-page="home">
-                <div class="page-content">
-                    <div class="empty-page">
-                        <div class="empty-icon">🏠</div>
-                        <h2>Accueil</h2>
-                        <p>Le dashboard sera ici (Lot 3)</p>
-                    </div>
+                <div class="page-content" id="homeContent">
+                    <!-- Rempli dynamiquement -->
                 </div>
             </section>
 
-            <!-- Page: Ajouter -->
+            <!-- ========== PAGE : AJOUTER ========== -->
             <section class="page" id="page-add" data-page="add" hidden>
                 <div class="page-content">
-                    <div class="add-menu">
+                    <div class="add-menu" id="addMenu">
+
                         <button class="add-menu-item" data-add="horaire">
                             <span class="add-menu-icon">⏰</span>
                             <div class="add-menu-text">
@@ -71,6 +75,7 @@
                             </div>
                             <span class="add-menu-arrow">›</span>
                         </button>
+
                         <button class="add-menu-item" data-add="depense">
                             <span class="add-menu-icon">💳</span>
                             <div class="add-menu-text">
@@ -79,6 +84,7 @@
                             </div>
                             <span class="add-menu-arrow">›</span>
                         </button>
+
                         <button class="add-menu-item" data-add="revenu">
                             <span class="add-menu-icon">💰</span>
                             <div class="add-menu-text">
@@ -87,6 +93,7 @@
                             </div>
                             <span class="add-menu-arrow">›</span>
                         </button>
+
                         <button class="add-menu-item" data-add="epargne">
                             <span class="add-menu-icon">🏦</span>
                             <div class="add-menu-text">
@@ -95,6 +102,7 @@
                             </div>
                             <span class="add-menu-arrow">›</span>
                         </button>
+
                         <button class="add-menu-item" data-add="objectif">
                             <span class="add-menu-icon">🎯</span>
                             <div class="add-menu-text">
@@ -103,6 +111,7 @@
                             </div>
                             <span class="add-menu-arrow">›</span>
                         </button>
+
                         <button class="add-menu-item" data-add="shopping">
                             <span class="add-menu-icon">🛒</span>
                             <div class="add-menu-text">
@@ -111,6 +120,7 @@
                             </div>
                             <span class="add-menu-arrow">›</span>
                         </button>
+
                         <button class="add-menu-item" data-add="recurrent">
                             <span class="add-menu-icon">🔁</span>
                             <div class="add-menu-text">
@@ -119,41 +129,53 @@
                             </div>
                             <span class="add-menu-arrow">›</span>
                         </button>
+
                     </div>
                 </div>
             </section>
 
-            <!-- Page: Budget -->
+            <!-- ========== PAGE : BUDGET ========== -->
             <section class="page" id="page-budget" data-page="budget" hidden>
                 <div class="page-content">
-                    <div class="segment-control">
+                    <div class="segment-control" id="budgetSegments">
                         <button class="segment active" data-segment="depenses">Dépenses</button>
                         <button class="segment" data-segment="shopping">À acheter</button>
                         <button class="segment" data-segment="recurrent">Récurrentes</button>
                         <button class="segment" data-segment="budgets">Budgets</button>
                     </div>
-                    <div class="empty-page">
-                        <div class="empty-icon">💳</div>
-                        <h2>Budget</h2>
-                        <p>Bientôt disponible (Lot 3)</p>
+                    <div id="budgetContent">
+                        <div class="empty-page">
+                            <div class="empty-icon">💳</div>
+                            <h2>Budget</h2>
+                            <p>Bientôt disponible (Lot 3)</p>
+                        </div>
                     </div>
                 </div>
             </section>
 
-            <!-- Page: Analyse -->
+            <!-- ========== PAGE : ANALYSE ========== -->
             <section class="page" id="page-analyse" data-page="analyse" hidden>
                 <div class="page-content">
-                    <div class="empty-page">
-                        <div class="empty-icon">📊</div>
-                        <h2>Analyse</h2>
-                        <p>Graphiques et statistiques (Lot 4)</p>
+                    <div class="segment-control" id="analyseSegments">
+                        <button class="segment active" data-segment="resume">Résumé</button>
+                        <button class="segment" data-segment="graphiques">Graphiques</button>
+                        <button class="segment" data-segment="calendrier">Calendrier</button>
+                    </div>
+                    <div id="analyseContent">
+                        <div class="empty-page">
+                            <div class="empty-icon">📊</div>
+                            <h2>Analyse</h2>
+                            <p>Graphiques et statistiques (Lot 4)</p>
+                        </div>
                     </div>
                 </div>
             </section>
 
-            <!-- Page: Plus -->
+            <!-- ========== PAGE : PLUS ========== -->
             <section class="page" id="page-more" data-page="more" hidden>
                 <div class="page-content">
+
+                    <!-- Modules -->
                     <div class="menu-list">
                         <button class="menu-item" data-more="epargne">
                             <span class="menu-icon">🏦</span>
@@ -177,54 +199,96 @@
                         </button>
                     </div>
 
+                    <!-- Compte -->
                     <div class="menu-section-title">Compte</div>
                     <div class="menu-list">
                         <button class="menu-item" data-more="account">
-                            <span class="menu-icon">👤</span>
-                            <span class="menu-label" id="menuAccountLabel">Mode local</span>
+                            <span class="menu-icon" id="menuAccountIcon">👤</span>
+                            <div style="flex:1; min-width:0;">
+                                <div class="menu-label" id="menuAccountLabel">Mode local</div>
+                                <div style="font-size:var(--text-xs); color:var(--text3); margin-top:2px;" id="menuAccountSub">Non connecté</div>
+                            </div>
+                            <span class="menu-arrow">›</span>
+                        </button>
+                        <button class="menu-item" id="btnSyncManual" hidden>
+                            <span class="menu-icon">🔄</span>
+                            <span class="menu-label">Synchroniser</span>
+                            <span class="menu-arrow">›</span>
+                        </button>
+                        <button class="menu-item danger" id="btnSignOut" hidden>
+                            <span class="menu-icon">🚪</span>
+                            <span class="menu-label">Se déconnecter</span>
                             <span class="menu-arrow">›</span>
                         </button>
                     </div>
 
+                    <!-- Personnalisation -->
                     <div class="menu-section-title">Personnalisation</div>
                     <div class="menu-list">
                         <button class="menu-item" data-more="theme">
                             <span class="menu-icon">🎨</span>
-                            <span class="menu-label">Thème</span>
+                            <div style="flex:1; min-width:0;">
+                                <div class="menu-label">Thème</div>
+                                <div style="font-size:var(--text-xs); color:var(--text3); margin-top:2px;" id="menuThemeLabel">Violet</div>
+                            </div>
+                            <span class="menu-arrow">›</span>
+                        </button>
+                        <button class="menu-item" data-more="widgets">
+                            <span class="menu-icon">🧩</span>
+                            <span class="menu-label">Widgets du dashboard</span>
                             <span class="menu-arrow">›</span>
                         </button>
                         <button class="menu-item" data-more="modules">
-                            <span class="menu-icon">🧩</span>
+                            <span class="menu-icon">📦</span>
                             <span class="menu-label">Modules actifs</span>
                             <span class="menu-arrow">›</span>
                         </button>
+                        <button class="menu-item" data-more="settings">
+                            <span class="menu-icon">⚙️</span>
+                            <span class="menu-label">Réglages généraux</span>
+                            <span class="menu-arrow">›</span>
+                        </button>
                         <button class="menu-item" data-more="pin">
-                            <span class="menu-icon">🔒</span>
-                            <span class="menu-label">Code PIN</span>
+                            <span class="menu-icon" id="menuPinIcon">🔓</span>
+                            <div style="flex:1; min-width:0;">
+                                <div class="menu-label">Code PIN</div>
+                                <div style="font-size:var(--text-xs); color:var(--text3); margin-top:2px;" id="menuPinSub">Désactivé</div>
+                            </div>
                             <span class="menu-arrow">›</span>
                         </button>
                     </div>
 
+                    <!-- Données -->
                     <div class="menu-section-title">Données</div>
                     <div class="menu-list">
                         <button class="menu-item" data-more="export">
                             <span class="menu-icon">📤</span>
-                            <span class="menu-label">Exporter</span>
+                            <div style="flex:1; min-width:0;">
+                                <div class="menu-label">Exporter</div>
+                                <div style="font-size:var(--text-xs); color:var(--text3); margin-top:2px;">Sauvegarde JSON</div>
+                            </div>
                             <span class="menu-arrow">›</span>
                         </button>
                         <button class="menu-item" data-more="import">
                             <span class="menu-icon">📥</span>
-                            <span class="menu-label">Importer</span>
+                            <div style="flex:1; min-width:0;">
+                                <div class="menu-label">Importer</div>
+                                <div style="font-size:var(--text-xs); color:var(--text3); margin-top:2px;">Restaurer une sauvegarde</div>
+                            </div>
                             <span class="menu-arrow">›</span>
                         </button>
                         <button class="menu-item danger" data-more="reset">
                             <span class="menu-icon">🗑️</span>
-                            <span class="menu-label">Tout effacer</span>
+                            <div style="flex:1; min-width:0;">
+                                <div class="menu-label">Tout effacer</div>
+                                <div style="font-size:var(--text-xs); color:var(--text3); margin-top:2px;">Action irréversible</div>
+                            </div>
                             <span class="menu-arrow">›</span>
                         </button>
                     </div>
 
-                    <div class="app-version">MonBudget v5.0</div>
+                    <div class="app-version">MonBudget v5.0 • 🔒 Stockage local</div>
+
                 </div>
             </section>
 
@@ -256,7 +320,7 @@
 
     </div>
 
-    <!-- ============ SHEETS (Modals du bas) ============ -->
+    <!-- ============ SHEETS ============ -->
     <div class="sheet-overlay" id="sheetOverlay" hidden>
         <div class="sheet" id="sheet">
             <div class="sheet-handle"></div>
@@ -271,9 +335,17 @@
     <!-- ============ TOAST ============ -->
     <div class="toast-container" id="toastContainer"></div>
 
-    <!-- ============ SCRIPTS ============ -->
+    <!-- ============ FIREBASE SDK ============ -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+    <!-- ============ SCRIPTS DE L'APP ============ -->
     <script src="js/state.js"></script>
     <script src="js/storage.js"></script>
+    <script src="js/firebase.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/pin.js"></script>
     <script src="js/router.js"></script>
     <script src="js/app.js"></script>
 </body>
