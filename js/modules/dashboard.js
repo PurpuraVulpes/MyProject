@@ -84,48 +84,31 @@ const Dashboard = {
         }
     },
 
-    /**
-     * ==========================================
-     * RENDU PRINCIPAL DU DASHBOARD
-     * ==========================================
-     */
     render() {
         const container = document.getElementById('homeContent');
         if (!container) return;
 
-        // Header de bienvenue
         let html = this.renderHeader();
-
-        // Widgets activés (dans l'ordre défini)
         const activeWidgets = this.getActiveWidgets();
 
         if (activeWidgets.length === 0) {
             html += this.renderNoWidgets();
         } else {
             html += '<div class="dashboard-grid">';
-
             activeWidgets.forEach(widgetKey => {
                 const widget = this.availableWidgets[widgetKey];
                 if (widget && typeof this[widget.render] === 'function') {
                     html += this[widget.render]();
                 }
             });
-
             html += '</div>';
         }
 
-        // Astuce en bas
         html += this.renderHint();
-
         container.innerHTML = html;
-
-        // Attacher les événements
         this.attachEvents();
     },
 
-    /**
-     * Renvoie la liste des widgets actifs
-     */
     getActiveWidgets() {
         const widgetOrder = ['solde', 'revenus', 'depenses', 'epargne', 'heures',
                              'objectifs', 'recurrent', 'budgets', 'suggestions'];
@@ -135,11 +118,6 @@ const Dashboard = {
         });
     },
 
-    /**
-     * ==========================================
-     * HEADER
-     * ==========================================
-     */
     renderHeader() {
         const now = new Date();
         const hour = now.getHours();
@@ -191,11 +169,6 @@ const Dashboard = {
         `;
     },
 
-    /**
-     * ==========================================
-     * WIDGET : SOLDE (Ce qu'il reste)
-     * ==========================================
-     */
     renderSoldeWidget() {
         const currentM = StateHelpers.currentMonth();
         const revenue = StateHelpers.computeMonthlyRevenue(currentM);
@@ -243,11 +216,6 @@ const Dashboard = {
         `;
     },
 
-    /**
-     * ==========================================
-     * WIDGET : REVENUS
-     * ==========================================
-     */
     renderRevenusWidget() {
         const currentM = StateHelpers.currentMonth();
         const revenue = StateHelpers.computeMonthlyRevenue(currentM);
@@ -256,28 +224,13 @@ const Dashboard = {
         let detailHtml = '';
 
         if (revenue.paieRecue > 0) {
-            detailHtml += `
-                <div class="widget-detail-line">
-                    <span>💼 Paie reçue</span>
-                    <strong>${Format.money(revenue.paieRecue)}</strong>
-                </div>
-            `;
+            detailHtml += `<div class="widget-detail-line">💼 Paie reçue <strong>${Format.money(revenue.paieRecue)}</strong></div>`;
         } else if (revenue.gainPrevu > 0) {
-            detailHtml += `
-                <div class="widget-detail-line pending">
-                    <span>⏳ Paie à recevoir</span>
-                    <strong>${Format.money(revenue.gainPrevu)}</strong>
-                </div>
-            `;
+            detailHtml += `<div class="widget-detail-line pending">⏳ Paie à recevoir <strong>${Format.money(revenue.gainPrevu)}</strong></div>`;
         }
 
         if (revenue.totalExtras > 0) {
-            detailHtml += `
-                <div class="widget-detail-line">
-                    <span>🎁 Extras (${revenue.nbExtras})</span>
-                    <strong>+${Format.money(revenue.totalExtras)}</strong>
-                </div>
-            `;
+            detailHtml += `<div class="widget-detail-line">🎁 Extras (${revenue.nbExtras}) <strong>+${Format.money(revenue.totalExtras)}</strong></div>`;
         }
 
         let badgeText = '';
@@ -304,11 +257,6 @@ const Dashboard = {
         `;
     },
 
-    /**
-     * ==========================================
-     * WIDGET : DÉPENSES
-     * ==========================================
-     */
     renderDepensesWidget() {
         const currentM = StateHelpers.currentMonth();
         const expenses = StateHelpers.computeMonthlyExpenses(currentM);
@@ -328,11 +276,6 @@ const Dashboard = {
         `;
     },
 
-    /**
-     * ==========================================
-     * WIDGET : ÉPARGNE
-     * ==========================================
-     */
     renderEpargneWidget() {
         const solde = StateHelpers.getEpargneSolde();
         const currentM = StateHelpers.currentMonth();
@@ -350,11 +293,6 @@ const Dashboard = {
         `;
     },
 
-    /**
-     * ==========================================
-     * WIDGET : HEURES
-     * ==========================================
-     */
     renderHeuresWidget() {
         const currentM = StateHelpers.currentMonth();
         const horaires = StateHelpers.getHorairesForMonth(currentM);
@@ -373,11 +311,6 @@ const Dashboard = {
         `;
     },
 
-    /**
-     * ==========================================
-     * WIDGET : OBJECTIFS
-     * ==========================================
-     */
     renderObjectifsWidget() {
         const objectifs = State.data.objectifs || [];
 
@@ -393,7 +326,6 @@ const Dashboard = {
             `;
         }
 
-        // Afficher les 3 premiers objectifs non terminés + les terminés
         const notDone = objectifs.filter(o => o.deja < o.montant).slice(0, 3);
         const done = objectifs.filter(o => o.deja >= o.montant);
 
@@ -428,19 +360,10 @@ const Dashboard = {
             `;
         });
 
-        html += `
-                </div>
-            </div>
-        `;
-
+        html += `</div></div>`;
         return html;
     },
 
-    /**
-     * ==========================================
-     * WIDGET : DÉPENSES RÉCURRENTES
-     * ==========================================
-     */
     renderRecurrentWidget() {
         const recurrent = State.data.recurrent || [];
         const actifs = recurrent.filter(r => r.actif !== false);
@@ -457,7 +380,6 @@ const Dashboard = {
             `;
         }
 
-        // Calculer les prochaines échéances
         const today = new Date();
         const currentDay = today.getDate();
         const currentMonth = today.getMonth();
@@ -474,13 +396,8 @@ const Dashboard = {
             return { ...r, nextDate, daysLeft };
         });
 
-        // Trier par date la plus proche
         withDates.sort((a, b) => a.daysLeft - b.daysLeft);
-
-        // Total mensuel
         const totalMensuel = actifs.reduce((s, r) => s + r.montant, 0);
-
-        // Afficher les 3 premiers
         const next3 = withDates.slice(0, 3);
 
         let html = `
@@ -519,34 +436,22 @@ const Dashboard = {
             `;
         });
 
-        html += `
-                </div>
-            </div>
-        `;
-
+        html += `</div></div>`;
         return html;
     },
 
-    /**
-     * ==========================================
-     * WIDGET : ALERTES BUDGETS
-     * ==========================================
-     */
     renderBudgetsWidget() {
         const budgets = State.data.budgets || [];
-
         if (budgets.length === 0) return '';
 
         const currentM = StateHelpers.currentMonth();
         const depenses = StateHelpers.getDepensesForMonth(currentM);
 
-        // Calculer le total par catégorie
         const catTotals = {};
         depenses.forEach(d => {
             catTotals[d.categorie] = (catTotals[d.categorie] || 0) + d.montant;
         });
 
-        // Filtrer les budgets à afficher (proches ou dépassés)
         const alerts = budgets.map(b => {
             const spent = catTotals[b.categorie] || 0;
             const percent = b.max > 0 ? (spent / b.max) * 100 : 0;
@@ -555,7 +460,6 @@ const Dashboard = {
 
         if (alerts.length === 0) return '';
 
-        // Trier par % décroissant
         alerts.sort((a, b) => b.percent - a.percent);
 
         let html = `
@@ -591,22 +495,12 @@ const Dashboard = {
             `;
         });
 
-        html += `
-                </div>
-            </div>
-        `;
-
+        html += `</div></div>`;
         return html;
     },
 
-    /**
-     * ==========================================
-     * WIDGET : SUGGESTIONS
-     * ==========================================
-     */
     renderSuggestionsWidget() {
         const suggestions = this.generateSuggestions();
-
         if (suggestions.length === 0) return '';
 
         let html = `
@@ -631,23 +525,15 @@ const Dashboard = {
             `;
         });
 
-        html += `
-                </div>
-            </div>
-        `;
-
+        html += `</div></div>`;
         return html;
     },
 
-    /**
-     * Génère des suggestions intelligentes
-     */
     generateSuggestions() {
         const suggestions = [];
         const currentM = StateHelpers.currentMonth();
         const prevM = StateHelpers.getPreviousMonth(currentM);
 
-        // Comparaison dépenses mois actuel vs précédent
         const currentDep = StateHelpers.computeMonthlyExpenses(currentM);
         const prevDep = StateHelpers.computeMonthlyExpenses(prevM);
 
@@ -668,7 +554,6 @@ const Dashboard = {
             }
         }
 
-        // Objectifs proches
         const objectifs = State.data.objectifs || [];
         objectifs.forEach(o => {
             const percent = (o.deja / o.montant) * 100;
@@ -680,7 +565,6 @@ const Dashboard = {
             }
         });
 
-        // Épargne
         const epargneSolde = StateHelpers.getEpargneSolde();
         const revenue = StateHelpers.computeMonthlyRevenue(currentM);
 
@@ -694,39 +578,16 @@ const Dashboard = {
             }
         }
 
-        // Dépenses récurrentes non payées
-        const today = new Date();
-        const currentDay = today.getDate();
-        const recurrent = (State.data.recurrent || []).filter(r => r.actif !== false);
-
-        recurrent.forEach(r => {
-            if (r.jour < currentDay && r.jour >= currentDay - 3) {
-                // Vérifier si payé ce mois
-                // (Pour l'instant on suppose que non)
-                suggestions.push({
-                    icon: '🔔',
-                    text: `N'oubliez pas : <strong>${r.nom}</strong> était prévu le ${r.jour} du mois.`
-                });
-            }
-        });
-
         return suggestions;
     },
 
-    /**
-     * ==========================================
-     * ÉVÉNEMENTS
-     * ==========================================
-     */
     attachEvents() {
-        // Widgets qui naviguent vers une page
         document.querySelectorAll('[data-widget-nav]').forEach(w => {
             w.addEventListener('click', () => {
                 Router.navigateTo(w.dataset.widgetNav);
             });
         });
 
-        // Widgets qui ouvrent une action du menu "Plus"
         document.querySelectorAll('[data-widget-more]').forEach(w => {
             w.addEventListener('click', () => {
                 Router.navigateTo('more');
@@ -737,11 +598,6 @@ const Dashboard = {
         });
     },
 
-    /**
-     * ==========================================
-     * SHEET DE CONFIGURATION DES WIDGETS
-     * ==========================================
-     */
     openWidgetsSheet() {
         let html = `
             <p style="color: var(--text2); font-size: var(--text-sm); text-align: center; margin-bottom: var(--space-md);">
@@ -769,7 +625,6 @@ const Dashboard = {
 
         const self = this;
         setTimeout(() => {
-            // ✅ Attacher les événements sur toute la row
             document.querySelectorAll('[data-widget-row]').forEach(row => {
                 row.addEventListener('click', (e) => {
                     e.preventDefault();
@@ -791,7 +646,6 @@ const Dashboard = {
                         CloudSync.saveSettings();
                     }
 
-                    // Rafraîchir le dashboard si on est dessus
                     if (State.currentPage === 'home') {
                         self.render();
                     }
@@ -799,6 +653,6 @@ const Dashboard = {
             });
         }, 150);
     }
+};
 
-// Alias global
 window.Dashboard = Dashboard;
