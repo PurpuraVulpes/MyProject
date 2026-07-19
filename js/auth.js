@@ -38,6 +38,9 @@ const Auth = {
     /**
      * Utilisateur connecté avec succès
      */
+        /**
+     * Utilisateur connecté avec succès
+     */
     async onUserSignedIn(user) {
         console.log('👤 Connecté:', user.email);
 
@@ -49,6 +52,9 @@ const Auth = {
             email: user.email,
             displayName: user.displayName
         };
+
+        // ✅ Mémoriser l'état
+        localStorage.setItem('mb_last_auth_state', 'signed_in');
 
         // Démarrer la sync temps réel
         CloudSync.startRealtimeSync(user.uid);
@@ -68,12 +74,18 @@ const Auth = {
     /**
      * Utilisateur déconnecté
      */
+        /**
+     * Utilisateur déconnecté
+     */
     onUserSignedOut() {
         console.log('👋 Déconnecté');
 
         this.currentUser = null;
         this.isAuthenticated = false;
         State.user = null;
+
+        // ✅ Nettoyer l'état
+        localStorage.removeItem('mb_last_auth_state');
 
         // Arrêter la sync
         CloudSync.stopSync();
