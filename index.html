@@ -24,6 +24,7 @@
     <link rel="stylesheet" href="css/components.css">
     <link rel="stylesheet" href="css/modules.css">
     <link rel="stylesheet" href="css/analyse.css">
+    <link rel="stylesheet" href="css/advanced.css">
 </head>
 <body>
 
@@ -59,7 +60,7 @@
             <!-- ========== PAGE : ACCUEIL ========== -->
             <section class="page" id="page-home" data-page="home">
                 <div class="page-content" id="homeContent">
-                    <!-- Rempli dynamiquement par Dashboard.render() -->
+                    <!-- Rempli dynamiquement -->
                 </div>
             </section>
 
@@ -153,9 +154,7 @@
                         <button class="segment" data-segment="recurrent">Récurrentes</button>
                         <button class="segment" data-segment="budgets">Budgets</button>
                     </div>
-                    <div id="budgetContent">
-                        <!-- Rempli dynamiquement -->
-                    </div>
+                    <div id="budgetContent"></div>
                 </div>
             </section>
 
@@ -167,9 +166,7 @@
                         <button class="segment" data-analyse-view="graphiques">📈 Graphiques</button>
                         <button class="segment" data-analyse-view="calendrier">📅 Calendrier</button>
                     </div>
-                    <div id="analyseContent">
-                        <!-- Rempli dynamiquement -->
-                    </div>
+                    <div id="analyseContent"></div>
                 </div>
             </section>
 
@@ -224,6 +221,32 @@
                         </button>
                     </div>
 
+                    <!-- Fonctionnalités avancées LOT 5 -->
+                    <div class="menu-section-title">Fonctionnalités</div>
+                    <div class="menu-list">
+                        <button class="menu-item" data-more="notifications">
+                            <span class="menu-icon" id="menuNotifIcon">🔔</span>
+                            <div style="flex:1; min-width:0;">
+                                <div class="menu-label">Notifications</div>
+                                <div style="font-size:var(--text-xs); color:var(--text3); margin-top:2px;" id="menuNotifSub">Non activées</div>
+                            </div>
+                            <span class="menu-arrow">›</span>
+                        </button>
+                        <button class="menu-item" data-more="devises">
+                            <span class="menu-icon">💱</span>
+                            <div style="flex:1; min-width:0;">
+                                <div class="menu-label">Multi-devises</div>
+                                <div style="font-size:var(--text-xs); color:var(--text3); margin-top:2px;" id="menuDeviseSub">€ EUR</div>
+                            </div>
+                            <span class="menu-arrow">›</span>
+                        </button>
+                        <button class="menu-item" data-more="recurrent-check">
+                            <span class="menu-icon">🔁</span>
+                            <span class="menu-label">Vérifier les récurrentes</span>
+                            <span class="menu-arrow">›</span>
+                        </button>
+                    </div>
+
                     <!-- Personnalisation -->
                     <div class="menu-section-title">Personnalisation</div>
                     <div class="menu-list">
@@ -263,19 +286,11 @@
                     <!-- Données -->
                     <div class="menu-section-title">Données</div>
                     <div class="menu-list">
-                        <button class="menu-item" data-more="export">
+                        <button class="menu-item" data-more="export-import">
                             <span class="menu-icon">📤</span>
                             <div style="flex:1; min-width:0;">
-                                <div class="menu-label">Exporter</div>
-                                <div style="font-size:var(--text-xs); color:var(--text3); margin-top:2px;">Sauvegarde JSON</div>
-                            </div>
-                            <span class="menu-arrow">›</span>
-                        </button>
-                        <button class="menu-item" data-more="import">
-                            <span class="menu-icon">📥</span>
-                            <div style="flex:1; min-width:0;">
-                                <div class="menu-label">Importer</div>
-                                <div style="font-size:var(--text-xs); color:var(--text3); margin-top:2px;">Restaurer une sauvegarde</div>
+                                <div class="menu-label">Import / Export</div>
+                                <div style="font-size:var(--text-xs); color:var(--text3); margin-top:2px;">JSON, CSV, PDF</div>
                             </div>
                             <span class="menu-arrow">›</span>
                         </button>
@@ -289,7 +304,7 @@
                         </button>
                     </div>
 
-                    <div class="app-version">MonBudget v5.0 • 🚀 Version complète</div>
+                    <div class="app-version">MonBudget v5.0 • 🚀 Version complète (Lot 5)</div>
 
                 </div>
             </section>
@@ -369,6 +384,16 @@
     <script src="js/modules/graphiques.js"></script>
     <script src="js/modules/analyse.js"></script>
     <script src="js/modules/calendrier.js"></script>
+
+    <!-- ============ SERVICES LOT 5 ============ -->
+    <script src="js/services/notifications.js"></script>
+    <script src="js/services/devises.js"></script>
+    <script src="js/services/tags.js"></script>
+    <script src="js/services/tickets.js"></script>
+    <script src="js/services/exportImport.js"></script>
+
+    <!-- ============ MODULES LOT 5 ============ -->
+    <script src="js/modules/recurrent-check.js"></script>
 
     <!-- ============ MAIN ============ -->
     <script src="js/app.js"></script>
