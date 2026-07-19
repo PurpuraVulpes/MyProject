@@ -1,5 +1,5 @@
 /* ============================================
-   APP.JS - Point d'entrée principal v5 FINAL (Lot 5 + Fix session)
+   APP.JS - Point d'entrée principal v5 FINAL
    ============================================ */
 
 'use strict';
@@ -18,39 +18,23 @@ const App = {
         console.log('🚀 Initialisation MonBudget v5 FINAL...');
 
         try {
-            // 1. Storage
             Storage.init();
-
-            // 2. Thème
             this.applyTheme(State.settings.theme || 'purple');
 
-            // 3. Firebase
             const firebaseOk = FirebaseService.init();
-
-            // 4. Auth
             if (firebaseOk) Auth.init();
 
-            // 5. PIN
             PinLock.init();
-
-            // 6. Router
             Router.init();
 
-            // 7. Lot 5 — Services avancés
             if (typeof Notifications !== 'undefined') Notifications.init();
             if (typeof Devises !== 'undefined') Devises.init();
             if (typeof RecurrentCheck !== 'undefined') RecurrentCheck.init();
 
-            // 8. Events globaux
             this.setupGlobalEvents();
-
-            // 9. Raccourcis clavier
             this.setupKeyboardShortcuts();
-
-            // 10. Visibilité modules
             this.applyModulesVisibility();
 
-            // 11. Écran de démarrage (avec attente Firebase)
             await this.decideStartScreen(firebaseOk);
 
             this.initialized = true;
@@ -62,26 +46,17 @@ const App = {
         }
     },
 
-    /**
-     * ==========================================
-     * ÉCRAN DE DÉMARRAGE (avec attente session Firebase)
-     * ==========================================
-     */
     async decideStartScreen(firebaseAvailable) {
-        // ✅ Attendre que Firebase Auth restaure la session
         if (firebaseAvailable && FirebaseService.auth) {
             await new Promise((resolve) => {
                 const unsubscribe = FirebaseService.auth.onAuthStateChanged((user) => {
                     unsubscribe();
                     resolve(user);
                 });
-
-                // Timeout de sécurité : 3 secondes max
                 setTimeout(() => resolve(null), 3000);
             });
         }
 
-        // Cas 1 : Utilisateur restauré depuis la session Firebase
         if (firebaseAvailable && FirebaseService.auth && FirebaseService.auth.currentUser) {
             const user = FirebaseService.auth.currentUser;
             State.user = {
@@ -89,7 +64,6 @@ const App = {
                 email: user.email
             };
             State.isGuestMode = false;
-
             localStorage.setItem('mb_last_auth_state', 'signed_in');
             console.log('✅ Session Firebase restaurée:', user.email);
 
@@ -98,7 +72,6 @@ const App = {
             return;
         }
 
-        // Cas 2 : Mode local (précédemment choisi)
         const wasGuestMode = localStorage.getItem('mb_last_auth_state') === 'guest';
         if (State.isGuestMode || wasGuestMode || !firebaseAvailable) {
             State.isGuestMode = true;
@@ -107,7 +80,6 @@ const App = {
             return;
         }
 
-        // Cas 3 : Première visite ou déconnecté → écran d'auth
         this.hideSplash();
         setTimeout(() => Auth.showAuthScreen(), 300);
     },
@@ -241,64 +213,35 @@ const App = {
      */
     handleMoreAction(action) {
         switch (action) {
-            case 'account':
-                this.openAccountSheet();
-                break;
-            case 'theme':
-                this.openThemeSheet();
-                break;
-            case 'modules':
-                this.openModulesSheet();
-                break;
-            case 'widgets':
-                this.openWidgetsSheet();
-                break;
-            case 'settings':
-                this.openSettingsSheet();
-                break;
-            case 'pin':
-                this.openPinManageSheet();
-                break;
+            case 'account': this.openAccountSheet(); break;
+            case 'theme': this.openThemeSheet(); break;
+            case 'modules': this.openModulesSheet(); break;
+            case 'widgets': this.openWidgetsSheet(); break;
+            case 'settings': this.openSettingsSheet(); break;
+            case 'pin': this.openPinManageSheet(); break;
             case 'export-import':
-                if (typeof ExportImport !== 'undefined') {
-                    ExportImport.openExportSheet();
-                }
+                if (typeof ExportImport !== 'undefined') ExportImport.openExportSheet();
                 break;
             case 'notifications':
-                if (typeof Notifications !== 'undefined') {
-                    Notifications.openSettingsSheet();
-                }
+                if (typeof Notifications !== 'undefined') Notifications.openSettingsSheet();
                 break;
             case 'devises':
-                if (typeof Devises !== 'undefined') {
-                    Devises.openSettingsSheet();
-                }
+                if (typeof Devises !== 'undefined') Devises.openSettingsSheet();
                 break;
             case 'recurrent-check':
-                if (typeof RecurrentCheck !== 'undefined') {
-                    RecurrentCheck.manualCheck();
-                }
+                if (typeof RecurrentCheck !== 'undefined') RecurrentCheck.manualCheck();
                 break;
-            case 'reset':
-                this.confirmReset();
-                break;
-            case 'epargne':
-                Epargne.renderPage();
-                break;
-            case 'objectifs':
-                Objectifs.renderPage();
-                break;
-            case 'horaires':
-                this.openHorairesPage();
-                break;
+            case 'reset': this.confirmReset(); break;
+            case 'epargne': Epargne.renderPage(); break;
+            case 'objectifs': Objectifs.renderPage(); break;
+            case 'horaires': this.openHorairesPage(); break;
             case 'calendrier':
                 Router.navigateTo('analyse');
                 setTimeout(() => {
                     if (typeof Analyse !== 'undefined') Analyse.switchView('calendrier');
                 }, 300);
                 break;
-            default:
-                console.log('Action inconnue:', action);
+            default: console.log('Action inconnue:', action);
         }
     },
 
@@ -403,7 +346,9 @@ const App = {
     },
 
     openWidgetsSheet() {
-        Dashboard.openWidgetsSheet();
+        if (typeof Dashboard !== 'undefined') {
+            Dashboard.openWidgetsSheet();
+        }
     },
 
     openModulesSheet() {
@@ -443,7 +388,6 @@ const App = {
         Router.openSheet('modules', 'Modules actifs', html);
 
         setTimeout(() => {
-            // ✅ Attacher les événements sur toute la row (plus large zone de clic)
             document.querySelectorAll('[data-module-row]').forEach(row => {
                 row.addEventListener('click', (e) => {
                     e.preventDefault();
@@ -452,22 +396,28 @@ const App = {
                     const moduleName = row.dataset.moduleRow;
                     const sw = row.querySelector('.module-switch');
 
-                    // Toggle
                     State.modules[moduleName] = !State.modules[moduleName];
 
-                    // Mettre à jour visuellement
                     if (sw) {
                         sw.classList.toggle('active', State.modules[moduleName]);
                     }
 
-                    // Sauvegarder
-                    notifyStateChange();
+                    // Sauvegarde immédiate
+                    if (typeof Storage !== 'undefined') Storage.save();
+                    if (typeof notifyStateChange === 'function') notifyStateChange();
+
                     if (State.user && !State.isGuestMode && typeof CloudSync !== 'undefined') {
                         CloudSync.saveSettings();
                     }
 
-                    // Rafraîchir les menus
                     this.applyModulesVisibility();
+
+                    // Re-render le dashboard si widget affecté
+                    if (typeof Dashboard !== 'undefined') {
+                        Dashboard.render();
+                    }
+
+                    console.log('Module toggled:', moduleName, '=', State.modules[moduleName]);
                 });
             });
         }, 150);
@@ -549,7 +499,6 @@ const App = {
                 State.settings.devise = document.querySelector('.chip[data-devise].active')?.dataset.devise || '€';
                 State.settings.arrondi = document.querySelector('.chip[data-arrondi].active')?.dataset.arrondi || 'none';
 
-                // Recalculer les gains
                 State.data.horaires.forEach(h => {
                     if (h.debut && h.fin) {
                         const minutes = StateHelpers.calcMinutes(h.debut, h.fin, h.pause || 0);
@@ -654,7 +603,6 @@ const App = {
     },
 
     updateAccountUI() {
-        // Compte
         const label = document.getElementById('menuAccountLabel');
         const sub = document.getElementById('menuAccountSub');
         const icon = document.getElementById('menuAccountIcon');
@@ -680,7 +628,6 @@ const App = {
         if (btnSignOut) btnSignOut.hidden = !State.user;
         if (btnSyncManual) btnSyncManual.hidden = !State.user;
 
-        // PIN
         const pinIcon = document.getElementById('menuPinIcon');
         const pinSub = document.getElementById('menuPinSub');
         if (pinIcon && pinSub) {
@@ -696,7 +643,6 @@ const App = {
         const btnLock = document.getElementById('btnLock');
         if (btnLock) btnLock.hidden = !Storage.hasPin();
 
-        // Notifications
         const notifIcon = document.getElementById('menuNotifIcon');
         const notifSub = document.getElementById('menuNotifSub');
         if (notifIcon && notifSub && typeof Notifications !== 'undefined') {
@@ -712,7 +658,6 @@ const App = {
             }
         }
 
-        // Devise
         const deviseSub = document.getElementById('menuDeviseSub');
         if (deviseSub) {
             const currentDevise = State.settings.devise;
@@ -787,7 +732,9 @@ const App = {
 
         switch (page) {
             case 'home':
-                Dashboard.render();
+                if (typeof Dashboard !== 'undefined') {
+                    Dashboard.render();
+                }
                 break;
             case 'add':
                 this.applyModulesVisibility();
@@ -971,7 +918,6 @@ const App = {
         }
         this._lastActivity = Date.now();
 
-        // Vérifier les récurrentes échues
         if (typeof RecurrentCheck !== 'undefined') {
             setTimeout(() => RecurrentCheck.checkPending(), 1000);
         }
@@ -1099,13 +1045,10 @@ window.Shopping = Shopping;
 window.Recurrent = Recurrent;
 window.Budgets = Budgets;
 
-// Lot 4
 if (typeof Graphiques !== 'undefined') window.Graphiques = Graphiques;
 if (typeof Analyse !== 'undefined') window.Analyse = Analyse;
 if (typeof Calendrier !== 'undefined') window.Calendrier = Calendrier;
 if (typeof Suggestions !== 'undefined') window.Suggestions = Suggestions;
-
-// Lot 5
 if (typeof Notifications !== 'undefined') window.Notifications = Notifications;
 if (typeof Devises !== 'undefined') window.Devises = Devises;
 if (typeof Tags !== 'undefined') window.Tags = Tags;
@@ -1113,7 +1056,4 @@ if (typeof Tickets !== 'undefined') window.Tickets = Tickets;
 if (typeof ExportImport !== 'undefined') window.ExportImport = ExportImport;
 if (typeof RecurrentCheck !== 'undefined') window.RecurrentCheck = RecurrentCheck;
 
-/**
- * Démarrage
- */
 document.addEventListener('DOMContentLoaded', () => App.init());
