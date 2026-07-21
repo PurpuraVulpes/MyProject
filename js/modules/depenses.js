@@ -1,10 +1,14 @@
 /* ============================================
    DEPENSES.JS - Gestion des dépenses
+   ✅ CORRIGÉ : Anti-doublons + protection init multiple
    ============================================ */
 
 'use strict';
 
 const Depenses = {
+
+    // ✅ Flag pour empêcher les sauvegardes multiples
+    _isSaving: false,
 
     /**
      * Ouvre le formulaire d'ajout de dépense
@@ -43,19 +47,30 @@ const Depenses = {
         Router.openSheet('add-depense', '💳 Nouvelle dépense', html);
 
         setTimeout(() => {
-            // Catégories
             FormHelpers.attachCategoryEvents(document.getElementById('sheetContent'));
 
-            // Bouton sauvegarder
             const btn = document.getElementById('btnSaveDepense');
-            if (btn) btn.addEventListener('click', () => this.save());
+            if (btn) {
+                // ✅ Utiliser un flag pour empêcher les doubles clics
+                btn.addEventListener('click', () => {
+                    if (this._isSaving) return;
+                    this.save();
+                });
+            }
         }, 100);
     },
 
     /**
      * Sauvegarde la dépense
+     * ✅ Protection contre les doubles enregistrements
      */
     save() {
+        // ✅ Bloquer les appels multiples
+        if (this._isSaving) {
+            console.warn('⚠️ Sauvegarde déjà en cours, ignoré');
+            return;
+        }
+
         const date = FormHelpers.getText('addDepenseDate');
         const montant = FormHelpers.getNumber('addDepenseMontant');
         const categorie = FormHelpers.getText('addDepenseCategorie');
@@ -69,6 +84,16 @@ const Depenses = {
         if (!categorie) {
             Toast.warning('⚠️ Choisissez une catégorie');
             return;
+        }
+
+        // ✅ Activer le flag
+        this._isSaving = true;
+
+        // ✅ Désactiver visuellement le bouton
+        const btn = document.getElementById('btnSaveDepense');
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = '⏳ Enregistrement...';
         }
 
         const depense = {
@@ -87,6 +112,11 @@ const Depenses = {
 
         if (State.currentPage === 'home') Dashboard.render();
         if (State.currentPage === 'budget') this.refresh();
+
+        // ✅ Réactiver après un délai
+        setTimeout(() => {
+            this._isSaving = false;
+        }, 1000);
     },
 
     /**
@@ -95,33 +125,34 @@ const Depenses = {
      * ==========================================
      */
 
-    /**
-     * Rendu de l'onglet dépenses
-     */
     renderPage() {
         let html = '';
-
-        // Filtre de mois
         html += FormHelpers.renderMonthFilter('filtreDepenseMois');
-
-        // Stats
         html += '<div id="depenseStats"></div>';
-
-        // Résumé catégories
         html += '<div id="depenseCatSummary"></div>';
-
-        // Liste
         html += '<div class="list" id="depenseList"></div>';
-
         return html;
     },
 
     /**
      * Rafraîchit le contenu
+     * ✅ CORRIGÉ : Déduplique les dépenses par ID
      */
     refresh(monthStr) {
         const month = monthStr || FormHelpers.getText('filtreDepenseMois') || StateHelpers.currentMonth();
-        const depenses = StateHelpers.getDepensesForMonth(month);
+        
+        // ✅ Dédupliquer les dépenses par ID (sécurité)
+        const allDepenses = StateHelpers.getDepensesForMonth(month);
+        const seen = new Set();
+        const depenses = allDepenses.filter(d => {
+            const key = String(d.id);
+            if (seen.has(key)) {
+                console.warn('⚠️ Doublon détecté et ignoré:', d);
+                return false;
+            }
+            seen.add(key);
+            return true;
+        });
 
         // Stats rapides
         const statsContainer = document.getElementById('depenseStats');
@@ -192,7 +223,6 @@ const Depenses = {
             return;
         }
 
-        // Regrouper par catégorie
         const cats = {};
         depenses.forEach(d => {
             cats[d.categorie] = (cats[d.categorie] || 0) + d.montant;
@@ -226,8 +256,18 @@ const Depenses = {
 
     /**
      * Initialise les événements
+     * ✅ CORRIGÉ : Empêche l'attachement multiple de listeners
      */
     init(container) {
+        if (!container) return;
+
+        // ✅ Marquer le container pour éviter les init multiples
+        if (container.dataset.depensesInit === 'true') {
+            this.refresh();
+            return;
+        }
+        container.dataset.depensesInit = 'true';
+
         FormHelpers.attachMonthFilterEvents(container, (newMonth) => {
             this.refresh(newMonth);
         });

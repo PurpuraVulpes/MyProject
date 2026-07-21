@@ -1,6 +1,6 @@
 /* ============================================
    APP.JS - Point d'entrée principal v5 FINAL
-   (Anti-clignotement + toutes corrections)
+   ✅ CORRIGÉ : Anti-doublons dans addData()
    ============================================ */
 
 'use strict';
@@ -159,7 +159,6 @@ const App = {
 
         document.addEventListener('data:imported', () => this.refreshUI());
 
-        // ✅ Cloud update : ne rafraîchir que le dashboard avec debounce
         document.addEventListener('cloud:updated', () => {
             if (State.currentPage === 'home' && typeof Dashboard !== 'undefined') {
                 if (this._cloudRefreshTimer) clearTimeout(this._cloudRefreshTimer);
@@ -203,6 +202,7 @@ const App = {
     /**
      * ==========================================
      * ACTIONS MENU PLUS
+     * ✅ Ajout de "clean-duplicates"
      * ==========================================
      */
     handleMoreAction(action) {
@@ -224,6 +224,9 @@ const App = {
                 break;
             case 'recurrent-check':
                 if (typeof RecurrentCheck !== 'undefined') RecurrentCheck.manualCheck();
+                break;
+            case 'clean-duplicates':
+                this.confirmCleanDuplicates();
                 break;
             case 'reset': this.confirmReset(); break;
             case 'epargne': Epargne.renderPage(); break;
@@ -260,6 +263,31 @@ const App = {
 
     /**
      * ==========================================
+     * ✅ NOUVEAU : NETTOYAGE DES DOUBLONS
+     * ==========================================
+     */
+    confirmCleanDuplicates() {
+        Router.openSheet('confirm-clean', '🧹 Nettoyer les doublons ?', `
+            <p style="color:var(--text2);text-align:center;margin-bottom:var(--space-lg);">
+                Cette action va analyser vos données et supprimer les doublons.<br>
+                <strong>Une seule entrée sera conservée</strong> pour chaque dépense identique.
+            </p>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="Router.closeSheet()">Annuler</button>
+                <button class="btn btn-primary" id="btnConfirmClean">🧹 Nettoyer</button>
+            </div>
+        `);
+        setTimeout(() => {
+            document.getElementById('btnConfirmClean')?.addEventListener('click', async () => {
+                Router.closeSheet();
+                await CloudSync.cleanDuplicates();
+                setTimeout(() => location.reload(), 1500);
+            });
+        }, 100);
+    },
+
+       /**
+     * ==========================================
      * SHEETS
      * ==========================================
      */
@@ -273,6 +301,7 @@ const App = {
                 </div>
                 <div class="form">
                     <button class="btn btn-outline btn-block" onclick="CloudSync.manualSync()">🔄 Synchroniser</button>
+                    <button class="btn btn-outline btn-block" onclick="App.confirmCleanDuplicates()">🧹 Nettoyer doublons</button>
                     <button class="btn btn-outline btn-block" style="color: var(--danger); border-color: rgba(255,107,107,0.3);" onclick="Auth.handleSignOut()">🚪 Se déconnecter</button>
                 </div>`;
         } else if (State.isGuestMode) {
@@ -496,7 +525,6 @@ const App = {
         }, 100);
     },
 
-    // EXPORT / IMPORT
     handleExport() {
         if (Storage.downloadExport()) Toast.success('📤 Exporté !');
         else Toast.error('❌ Erreur');
@@ -568,7 +596,7 @@ const App = {
 
     /**
      * ==========================================
-     * UI REFRESH (sans clignotement)
+     * UI REFRESH
      * ==========================================
      */
     refreshUI() {
@@ -576,12 +604,10 @@ const App = {
         this.applyModulesVisibility();
         this.updateAccountUI();
 
-        // ✅ Rafraîchir seulement le dashboard
         if (typeof Dashboard !== 'undefined') Dashboard.render();
     },
 
     refreshCurrentPage() {
-        // ✅ Ne rafraîchir que le dashboard (pas les autres pages)
         if (State.currentPage === 'home' && typeof Dashboard !== 'undefined') {
             Dashboard.render();
         }
@@ -611,16 +637,14 @@ const App = {
 
     /**
      * ==========================================
-     * PAGE CHANGED (anti-clignotement)
+     * PAGE CHANGED
      * ==========================================
      */
     onPageChanged(page, previous) {
         console.log(`📄 Page: ${previous || 'none'} → ${page}`);
 
-        // ✅ Si même page + déjà initialisé → ne rien faire
         if (page === previous && this.initialized) return;
 
-        // ✅ Retirer les classes de transition après l'animation
         setTimeout(() => {
             document.querySelectorAll('.page').forEach(p => {
                 p.classList.remove('page-transition-forward', 'page-transition-backward');
@@ -654,7 +678,6 @@ const App = {
         }
     },
 
-    // ✅ Attache les événements sans cloner (pas de clignotement)
     attachAddMenuEvents() {
         document.querySelectorAll('.add-menu-item[data-add]').forEach(item => {
             if (item.dataset.eventsAttached === 'true') return;
@@ -666,6 +689,7 @@ const App = {
     /**
      * ==========================================
      * BUDGET
+     * ✅ CORRIGÉ : Reset du flag init pour éviter les doublons
      * ==========================================
      */
     _currentBudgetSegment: 'depenses',
@@ -687,6 +711,9 @@ const App = {
         const segment = this._currentBudgetSegment || 'depenses';
         const content = document.getElementById('budgetContent');
         if (!content) return;
+
+        // ✅ Réinitialiser le flag d'init pour permettre un ré-init propre
+        content.dataset.depensesInit = 'false';
 
         switch (segment) {
             case 'depenses':
@@ -778,31 +805,65 @@ const App = {
 
     /**
      * ==========================================
-     * DATA HELPERS
+     * ✅ DATA HELPERS - ANTI-DOUBLONS
      * ==========================================
+     */
+    
+    /**
+     * ✅ CORRIGÉ : Ajoute une entrée en évitant les doublons
      */
     addData(collection, item) {
         if (!State.data[collection]) return false;
+        
+        // ✅ Garantir un ID unique
         item.id = item.id || StateHelpers.generateId();
-        State.data[collection].push(item);
+        
+        // ✅ VÉRIFIER si l'item existe déjà (évite les doublons)
+        const existing = State.data[collection].find(
+            x => String(x.id) === String(item.id)
+        );
+        
+        if (existing) {
+            console.warn(`⚠️ Item ${item.id} existe déjà dans ${collection}, mise à jour à la place`);
+            Object.assign(existing, item);
+        } else {
+            State.data[collection].push(item);
+        }
+        
         notifyStateChange();
-        if (State.user && !State.isGuestMode) CloudSync.saveItem(collection, item);
-        document.dispatchEvent(new CustomEvent('data:added', { detail: { collection, item } }));
+        
+        if (State.user && !State.isGuestMode) {
+            CloudSync.saveItem(collection, item);
+        }
+        
+        document.dispatchEvent(new CustomEvent('data:added', { 
+            detail: { collection, item } 
+        }));
         return true;
     },
 
+    /**
+     * Supprime une entrée
+     */
     removeData(collection, id) {
         if (!State.data[collection]) return false;
-        State.data[collection] = State.data[collection].filter(item => item.id !== id);
+        State.data[collection] = State.data[collection].filter(
+            item => String(item.id) !== String(id)
+        );
         notifyStateChange();
         if (State.user && !State.isGuestMode) CloudSync.deleteItem(collection, id);
         document.dispatchEvent(new CustomEvent('data:removed', { detail: { collection, id } }));
         return true;
     },
 
+    /**
+     * Met à jour une entrée
+     */
     updateData(collection, id, patch) {
         if (!State.data[collection]) return false;
-        const item = State.data[collection].find(item => item.id === id);
+        const item = State.data[collection].find(
+            item => String(item.id) === String(id)
+        );
         if (!item) return false;
         Object.assign(item, patch);
         notifyStateChange();
@@ -813,7 +874,9 @@ const App = {
 };
 
 /**
+ * ==========================================
  * TOAST
+ * ==========================================
  */
 const Toast = {
     show(message, type = 'default') {

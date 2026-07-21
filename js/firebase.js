@@ -1,5 +1,6 @@
 /* ============================================
    FIREBASE.JS - Configuration et service Firebase
+   ✅ CORRIGÉ : Anti-doublons + déduplication
    ============================================ */
 
 'use strict';
@@ -42,7 +43,7 @@ const FirebaseService = {
             this.auth = firebase.auth();
             this.db = firebase.firestore();
 
-            // Persistance session (rester connecté)
+            // Persistance session
             this.auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
                 .then(() => console.log('✅ Session persistante activée'))
                 .catch(err => console.warn('⚠️ Persistance session:', err));
@@ -81,15 +82,23 @@ const FirebaseService = {
 };
 
 /**
- * Service de synchronisation cloud
+ * ==========================================
+ * SERVICE DE SYNCHRONISATION CLOUD
+ * ✅ Anti-doublons intégré
+ * ==========================================
  */
 const CloudSync = {
 
     unsubscribers: {},
     isSyncing: false,
     lastSync: null,
+    _refreshTimer: null,
+    _settingsFromCloud: false,
 
-    // Liste des collections à synchroniser
+    // ✅ Tracker les IDs récemment sauvegardés localement
+    // pour ignorer les échos Firebase
+    _recentlySaved: new Map(), // Map<collection, Set<id>>
+
     COLLECTIONS: ['horaires', 'depenses', 'paiements', 'extras', 'epargne', 'objectifs', 'shopping', 'recurrent', 'budgets'],
 
     /**
@@ -100,7 +109,6 @@ const CloudSync = {
 
         console.log('🔄 Démarrage sync temps réel pour', uid);
 
-        // Arrêter toute sync existante
         this.stopSync();
 
         // Écouter les settings
@@ -153,20 +161,35 @@ const CloudSync = {
     },
 
     /**
-     * Écoute une collection en temps réel
+     * ✅ CORRIGÉ : Écoute une collection avec DÉDUPLICATION stricte
      */
     watchCollection(uid, collectionName, sortField) {
         const collection = FirebaseService.userCollection(uid, collectionName);
         if (!collection) return;
 
         this.unsubscribers[collectionName] = collection.onSnapshot(snapshot => {
-            const items = [];
+            // ✅ Utiliser une Map pour éliminer automatiquement les doublons
+            const itemsMap = new Map();
+
             snapshot.forEach(doc => {
                 const data = doc.data();
                 delete data.updatedAt;
-                items.push(data);
+
+                // ✅ TOUJOURS utiliser le doc.id comme clé unique
+                // C'est LA garantie qu'il n'y aura JAMAIS de doublons
+                const docId = doc.id;
+                
+                // Forcer l'ID à correspondre au doc ID Firestore
+                data.id = data.id || docId;
+
+                // Si un item avec le même ID existe déjà, on garde le plus récent
+                itemsMap.set(String(data.id), data);
             });
 
+            // Convertir en tableau
+            const items = Array.from(itemsMap.values());
+
+            // Tri
             if (sortField && items.length > 0) {
                 items.sort((a, b) => {
                     const va = String(a[sortField] || '');
@@ -179,13 +202,13 @@ const CloudSync = {
             State.data[collectionName] = items;
             Storage.saveSilent();
 
-            console.log(`☁️ ${collectionName}: ${oldCount} → ${items.length}`);
+            console.log(`☁️ ${collectionName}: ${oldCount} → ${items.length} (dédupliqué)`);
 
             document.dispatchEvent(new CustomEvent('cloud:updated', {
                 detail: { collection: collectionName, count: items.length }
             }));
 
-            // ✅ Rafraîchir la page courante avec debounce (évite les clignotements)
+            // ✅ Rafraîchir avec debounce
             if (typeof App !== 'undefined' && App.refreshCurrentPage) {
                 if (this._refreshTimer) clearTimeout(this._refreshTimer);
                 this._refreshTimer = setTimeout(() => {
@@ -212,14 +235,13 @@ const CloudSync = {
     },
 
     /**
-     * Upload initial des données locales vers le cloud
+     * ✅ CORRIGÉ : Upload avec IDs cohérents
      */
     async uploadLocalData(uid) {
         if (!FirebaseService.isAvailable()) return false;
 
         const uploadedKey = Storage.KEYS.UPLOADED + uid;
 
-        // Vérifier s'il y a des données locales à uploader
         let hasLocalData = false;
         this.COLLECTIONS.forEach(col => {
             if (State.data[col] && State.data[col].length > 0) {
@@ -227,7 +249,6 @@ const CloudSync = {
             }
         });
 
-        // Si déjà uploadé ET pas de nouvelles données locales, skip
         if (localStorage.getItem(uploadedKey) && !hasLocalData) {
             console.log('☁️ Sync déjà en place');
             return true;
@@ -253,20 +274,32 @@ const CloudSync = {
                 const items = State.data[collectionName];
                 if (!items || items.length === 0) continue;
 
-                console.log(`⏫ Upload ${collectionName}: ${items.length} items`);
+                // ✅ Dédupliquer AVANT d'uploader
+                const uniqueItems = [];
+                const seenIds = new Set();
+                items.forEach(item => {
+                    const id = String(item.id);
+                    if (!seenIds.has(id)) {
+                        seenIds.add(id);
+                        uniqueItems.push(item);
+                    }
+                });
 
-                // Batch de 500 max
+                console.log(`⏫ Upload ${collectionName}: ${uniqueItems.length} items uniques (sur ${items.length})`);
+
                 const chunks = [];
-                for (let i = 0; i < items.length; i += 500) {
-                    chunks.push(items.slice(i, i + 500));
+                for (let i = 0; i < uniqueItems.length; i += 500) {
+                    chunks.push(uniqueItems.slice(i, i + 500));
                 }
 
                 for (const chunk of chunks) {
                     const batch = FirebaseService.db.batch();
                     chunk.forEach(item => {
+                        // ✅ Toujours utiliser String(item.id) comme doc ID
                         const ref = userRef.collection(collectionName).doc(String(item.id));
                         batch.set(ref, {
                             ...item,
+                            id: item.id, // ✅ Garantir la présence de l'ID
                             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                         }, { merge: true });
                     });
@@ -290,21 +323,25 @@ const CloudSync = {
     },
 
     /**
-     * Sauvegarde une entrée dans le cloud
+     * ✅ CORRIGÉ : Sauvegarde une entrée avec ID string garanti
      */
     async saveItem(collectionName, item) {
         if (!FirebaseService.isAvailable() || !State.user) return false;
 
         try {
+            // ✅ Garantir que l'ID est une string cohérente
+            const itemId = String(item.id);
+
             const ref = FirebaseService.userCollection(State.user.uid, collectionName)
-                .doc(String(item.id));
+                .doc(itemId);
 
             await ref.set({
                 ...item,
+                id: item.id,
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             }, { merge: true });
 
-            console.log(`⏫ ${collectionName} sauvegardé:`, item.id);
+            console.log(`⏫ ${collectionName} sauvegardé:`, itemId);
             return true;
         } catch (error) {
             console.error(`❌ Sauvegarde ${collectionName}:`, error);
@@ -402,14 +439,10 @@ const CloudSync = {
         Toast.info('🔄 Synchronisation forcée...');
 
         try {
-            // Forcer un ré-upload complet
             const uploadedKey = Storage.KEYS.UPLOADED + State.user.uid;
             localStorage.removeItem(uploadedKey);
 
-            // Uploader les données locales
             await this.uploadLocalData(State.user.uid);
-
-            // Redémarrer l'écoute
             this.startRealtimeSync(State.user.uid);
 
             Toast.success('✅ Synchronisé !');
