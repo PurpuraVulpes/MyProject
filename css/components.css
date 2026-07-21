@@ -1069,3 +1069,29 @@
     color: var(--text2);
     margin-top: 2px;
 }
+
+/* ===================================================
+   FIX iOS - Switch clickable
+   =================================================== */
+
+/* Les rows de switch sont des boutons pour iOS */
+.switch-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-md);
+    padding: var(--space-md) 0;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* Le switch lui-même ne capture plus les events */
+.switch-row .switch {
+    pointer-events: none;
+}
+
+/* Feedback tactile sur la row */
+.widget-row-btn:active,
+.module-row-btn:active {
+    opacity: 0.7;
+}
