@@ -9,7 +9,7 @@ const Epargne = {
     _currentMode: 'deposit',
 
     /**
-     * Ouvre le formulaire d'épargne (choix dépôt/retrait)
+     * Ouvre le menu de choix (dépôt / retrait)
      */
     openAddForm() {
         const solde = StateHelpers.getEpargneSolde();
@@ -46,14 +46,12 @@ const Epargne = {
 
         setTimeout(() => {
             document.getElementById('btnEpargneDeposit')?.addEventListener('click', () => {
-                Router.closeSheet();
-                setTimeout(() => this.openMouvementForm('deposit'), 200);
+                this.openMouvementForm('deposit');
             });
 
             document.getElementById('btnEpargneWithdraw')?.addEventListener('click', () => {
                 if (solde <= 0) return;
-                Router.closeSheet();
-                setTimeout(() => this.openMouvementForm('withdraw'), 200);
+                this.openMouvementForm('withdraw');
             });
         }, 100);
     },
@@ -116,7 +114,6 @@ const Epargne = {
             return;
         }
 
-        // Vérifier solde suffisant pour retrait
         if (!isDeposit && montant > StateHelpers.getEpargneSolde()) {
             Toast.warning('⚠️ Solde insuffisant');
             return;
@@ -147,10 +144,6 @@ const Epargne = {
      * ==========================================
      * PAGE D'HISTORIQUE
      * ==========================================
-     */
-
-    /**
-     * Rendu de la page épargne (dans sheet ou page complète)
      */
     renderPage() {
         const solde = StateHelpers.getEpargneSolde();
@@ -202,7 +195,6 @@ const Epargne = {
         const month = monthStr || FormHelpers.getText('filtreEpargneMois') || StateHelpers.currentMonth();
         const mouvements = StateHelpers.getEpargneForMonth(month);
 
-        // Stats
         const statsContainer = document.getElementById('epargneStats');
         if (statsContainer) {
             const depots = mouvements.filter(e => e.type === 'deposit');
@@ -217,7 +209,6 @@ const Epargne = {
             ]);
         }
 
-        // Liste
         const listContainer = document.getElementById('epargneList');
         if (listContainer) {
             if (mouvements.length === 0) {
@@ -261,5 +252,4 @@ const Epargne = {
     }
 };
 
-// Alias global
 window.Epargne = Epargne;
