@@ -760,10 +760,12 @@ const App = {
 
     attachAddMenuEvents() {
         document.querySelectorAll('.add-menu-item[data-add]').forEach(item => {
-            const newItem = item.cloneNode(true);
-            item.parentNode.replaceChild(newItem, item);
-            newItem.addEventListener('click', () => {
-                this.handleAddAction(newItem.dataset.add);
+            // Utiliser un flag pour éviter les doublons
+            if (item.dataset.eventsAttached === 'true') return;
+            item.dataset.eventsAttached = 'true';
+
+            item.addEventListener('click', () => {
+                this.handleAddAction(item.dataset.add);
             });
         });
     },
