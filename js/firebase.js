@@ -174,9 +174,12 @@ const CloudSync = {
                 detail: { collection: collectionName, count: items.length }
             }));
 
-            // Rafraîchir la page courante
+            // ✅ Rafraîchir la page courante avec debounce (évite les clignotements)
             if (typeof App !== 'undefined' && App.refreshCurrentPage) {
-                setTimeout(() => App.refreshCurrentPage(), 100);
+                if (this._refreshTimer) clearTimeout(this._refreshTimer);
+                this._refreshTimer = setTimeout(() => {
+                    App.refreshCurrentPage();
+                }, 500);
             }
         }, err => {
             console.error(`❌ Sync ${collectionName}:`, err);
