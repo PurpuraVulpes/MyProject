@@ -262,20 +262,41 @@
     background: var(--card);
     border: 1px solid var(--border-light);
     border-radius: var(--radius-lg);
-    transition: all var(--transition-fast);
+    transition: transform var(--transition-fast), background var(--transition-fast);
     text-align: left;
     width: 100%;
     color: var(--text);
+}
+
+/* Animation uniquement au premier chargement de la page */
+.page.page-transition-forward .add-menu-item,
+.page.page-transition-backward .add-menu-item {
     animation: slideUp var(--transition-slow) backwards;
 }
 
-.add-menu-item:nth-child(1) { animation-delay: 0.05s; }
-.add-menu-item:nth-child(2) { animation-delay: 0.1s; }
-.add-menu-item:nth-child(3) { animation-delay: 0.15s; }
-.add-menu-item:nth-child(4) { animation-delay: 0.2s; }
-.add-menu-item:nth-child(5) { animation-delay: 0.25s; }
-.add-menu-item:nth-child(6) { animation-delay: 0.3s; }
-.add-menu-item:nth-child(7) { animation-delay: 0.35s; }
+.page.page-transition-forward .add-menu-item:nth-child(1),
+.page.page-transition-backward .add-menu-item:nth-child(1) { animation-delay: 0.05s; }
+
+.page.page-transition-forward .add-menu-item:nth-child(2),
+.page.page-transition-backward .add-menu-item:nth-child(2) { animation-delay: 0.1s; }
+
+.page.page-transition-forward .add-menu-item:nth-child(3),
+.page.page-transition-backward .add-menu-item:nth-child(3) { animation-delay: 0.15s; }
+
+.page.page-transition-forward .add-menu-item:nth-child(4),
+.page.page-transition-backward .add-menu-item:nth-child(4) { animation-delay: 0.2s; }
+
+.page.page-transition-forward .add-menu-item:nth-child(5),
+.page.page-transition-backward .add-menu-item:nth-child(5) { animation-delay: 0.25s; }
+
+.page.page-transition-forward .add-menu-item:nth-child(6),
+.page.page-transition-backward .add-menu-item:nth-child(6) { animation-delay: 0.3s; }
+
+.page.page-transition-forward .add-menu-item:nth-child(7),
+.page.page-transition-backward .add-menu-item:nth-child(7) { animation-delay: 0.35s; }
+
+.page.page-transition-forward .add-menu-item:nth-child(8),
+.page.page-transition-backward .add-menu-item:nth-child(8) { animation-delay: 0.4s; }
 
 .add-menu-item:active {
     transform: scale(0.98);
