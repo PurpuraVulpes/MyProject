@@ -338,27 +338,37 @@ const App = {
 
         let html = '<div class="form" style="gap: 0;">';
         modules.forEach(m => {
-            html += `<div class="switch-row" data-module-row="${m.key}" style="cursor: pointer;">
-                <div class="switch-row-body"><div class="switch-row-title">${m.icon} ${m.label}</div><div class="switch-row-desc">${m.desc}</div></div>
-                <div class="switch module-switch ${State.modules[m.key] ? 'active' : ''}" data-module="${m.key}"></div>
-            </div>`;
+            const isActive = State.modules[m.key] === true;
+            html += `
+                <button type="button" class="switch-row module-row-btn" data-module-row="${m.key}" style="cursor: pointer; width: 100%; background: none; border: none; border-bottom: 1px solid var(--border-light); padding: var(--space-md) 0; text-align: left; color: var(--text); -webkit-tap-highlight-color: transparent;">
+                    <div class="switch-row-body">
+                        <div class="switch-row-title">${m.icon} ${m.label}</div>
+                        <div class="switch-row-desc">${m.desc}</div>
+                    </div>
+                    <div class="switch module-switch ${isActive ? 'active' : ''}" data-module="${m.key}" style="pointer-events: none;"></div>
+                </button>
+            `;
         });
         html += '</div>';
+
         Router.openSheet('modules', 'Modules actifs', html);
 
         setTimeout(() => {
             document.querySelectorAll('[data-module-row]').forEach(row => {
-                row.addEventListener('click', (e) => {
+                row.addEventListener('click', function(e) {
                     e.preventDefault();
-                    e.stopPropagation();
-                    const name = row.dataset.moduleRow;
-                    const sw = row.querySelector('.module-switch');
+
+                    const name = this.dataset.moduleRow;
+                    const sw = this.querySelector('.module-switch');
+
                     State.modules[name] = !State.modules[name];
                     if (sw) sw.classList.toggle('active', State.modules[name]);
+
                     if (typeof Storage !== 'undefined') Storage.save();
                     if (typeof notifyStateChange === 'function') notifyStateChange();
                     if (State.user && !State.isGuestMode && typeof CloudSync !== 'undefined') CloudSync.saveSettings();
-                    this.applyModulesVisibility();
+
+                    if (typeof App !== 'undefined') App.applyModulesVisibility();
                     if (typeof Dashboard !== 'undefined') Dashboard.render();
                 });
             });
