@@ -1,10 +1,16 @@
 /* ============================================
    REVENUS.JS - Salaires et revenus supplémentaires
+   ✅ CORRIGÉ : Protection anti-double-clic
    ============================================ */
 
 'use strict';
 
 const Revenus = {
+
+    // ✅ Flags anti-double-clic
+    _isSavingPaie: false,
+    _isSavingExtra: false,
+    _isReporting: false,
 
     /**
      * Ouvre le menu de choix (salaire / extra)
@@ -212,9 +218,12 @@ const Revenus = {
             });
         }
 
+        // ✅ Bouton "Enregistrer paie prévue" avec protection
         const btnPrevue = document.getElementById('btnEnregistrerPaie');
         if (btnPrevue) {
             btnPrevue.addEventListener('click', () => {
+                if (this._isSavingPaie) return;
+
                 const montant = parseFloat(document.getElementById('paieMontantAjuste').value);
                 if (!montant || montant <= 0) {
                     Toast.warning('⚠️ Montant invalide');
@@ -224,9 +233,13 @@ const Revenus = {
             });
         }
 
+        // ✅ Bouton manuel avec protection
         const btnManuel = document.getElementById('btnEnregistrerManuel');
         if (btnManuel) {
-            btnManuel.addEventListener('click', () => this.saveManualPaie());
+            btnManuel.addEventListener('click', () => {
+                if (this._isSavingPaie) return;
+                this.saveManualPaie();
+            });
         }
     },
 
@@ -252,7 +265,29 @@ const Revenus = {
         }
     },
 
+    /**
+     * ✅ CORRIGÉ : Sauvegarde de la paie avec protection anti-double-clic
+     */
     savePaie(mois, montant, description = '') {
+        // ✅ Bloquer les appels multiples
+        if (this._isSavingPaie) {
+            console.warn('⚠️ Sauvegarde paie déjà en cours');
+            return;
+        }
+        this._isSavingPaie = true;
+
+        // ✅ Désactiver les boutons
+        const btnPrevue = document.getElementById('btnEnregistrerPaie');
+        const btnManuel = document.getElementById('btnEnregistrerManuel');
+        if (btnPrevue) {
+            btnPrevue.disabled = true;
+            btnPrevue.textContent = '⏳ Enregistrement...';
+        }
+        if (btnManuel) {
+            btnManuel.disabled = true;
+            btnManuel.textContent = '⏳ Enregistrement...';
+        }
+
         const paiement = {
             id: StateHelpers.generateId(),
             mois: mois,
@@ -268,6 +303,11 @@ const Revenus = {
         Toast.success('✨ Paie de ' + Format.money(montant) + ' enregistrée !');
 
         if (State.currentPage === 'home') Dashboard.render();
+
+        // ✅ Réactiver après délai
+        setTimeout(() => {
+            this._isSavingPaie = false;
+        }, 1000);
     },
 
     saveManualPaie() {
@@ -325,11 +365,26 @@ const Revenus = {
             FormHelpers.attachCategoryEvents(document.getElementById('sheetContent'));
 
             const btn = document.getElementById('btnSaveExtra');
-            if (btn) btn.addEventListener('click', () => this.saveExtra());
+            if (btn) {
+                // ✅ Protection anti-double-clic
+                btn.addEventListener('click', () => {
+                    if (this._isSavingExtra) return;
+                    this.saveExtra();
+                });
+            }
         }, 100);
     },
 
+    /**
+     * ✅ CORRIGÉ : Sauvegarde extra avec protection anti-double-clic
+     */
     saveExtra() {
+        // ✅ Bloquer les appels multiples
+        if (this._isSavingExtra) {
+            console.warn('⚠️ Sauvegarde extra déjà en cours');
+            return;
+        }
+
         const date = FormHelpers.getText('addExtraDate');
         const montant = FormHelpers.getNumber('addExtraMontant');
         const source = FormHelpers.getText('addExtraSource');
@@ -343,6 +398,15 @@ const Revenus = {
         if (!source) {
             Toast.warning('⚠️ Choisissez une source');
             return;
+        }
+
+        this._isSavingExtra = true;
+
+        // ✅ Désactiver le bouton
+        const btn = document.getElementById('btnSaveExtra');
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = '⏳ Enregistrement...';
         }
 
         const extra = {
@@ -360,14 +424,26 @@ const Revenus = {
         Toast.success('✅ +' + Format.money(montant) + ' enregistré !');
 
         if (State.currentPage === 'home') Dashboard.render();
+
+        // ✅ Réactiver après délai
+        setTimeout(() => {
+            this._isSavingExtra = false;
+        }, 1000);
     },
 
     /**
      * ==========================================
      * REPORT DE SOLDE
+     * ✅ CORRIGÉ : Protection anti-double-clic
      * ==========================================
      */
     reportSolde(fromMonth) {
+        // ✅ Bloquer les appels multiples
+        if (this._isReporting) {
+            console.warn('⚠️ Report déjà en cours');
+            return;
+        }
+
         const solde = StateHelpers.computeMonthlyBalance(fromMonth);
 
         if (solde <= 0) {
@@ -384,6 +460,8 @@ const Revenus = {
         );
 
         const doReport = () => {
+            this._isReporting = true;
+
             if (existing) {
                 App.removeData('extras', existing.id);
             }
@@ -403,6 +481,11 @@ const Revenus = {
             Toast.success('✅ ' + Format.money(solde) + ' reporté à ' + Format.monthShort(nextMonth));
 
             if (State.currentPage === 'home') Dashboard.render();
+
+            // ✅ Réactiver après délai
+            setTimeout(() => {
+                this._isReporting = false;
+            }, 1000);
         };
 
         if (existing) {
